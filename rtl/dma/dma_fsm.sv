@@ -1,14 +1,12 @@
 module dma_fsm
-  // import amba_axi_pkg::*;
-  // import dma_utils_pkg::*;
   import axi_pkg::*;
   import dma_pkg::*;
 (
   input                                     clk,
   input                                     rst,
   // From/To CSRs
-  input   s_dma_control_t                   dma_ctrl_i,
-  input   s_dma_desc_t [`DMA_NUM_DESC-1:0]  dma_desc_i,
+  input   logic                             dma_go_i,
+  input   s_dma_desc_t                      dma_desc_i,
   output  s_dma_status_t                    dma_stats_o,
   // From/To AXI I/F
   input                                     axi_pend_txn_i,
@@ -28,26 +26,11 @@ module dma_fsm
   // _txn_: transaction
   // _mosi_: master out slave in
   dma_st_t cur_st_ff, next_st;
-  logic [`DMA_NUM_DESC-1:0] rd_desc_done_ff, next_rd_desc_done;
-  logic [`DMA_NUM_DESC-1:0] wr_desc_done_ff, next_wr_desc_done;
+  logic rd_desc_done_ff, next_rd_desc_done;
+  logic wr_desc_done_ff, next_wr_desc_done;
 
   logic pending_desc; // Gets set when there are pending descriptors to process
   logic pending_rd_desc, pending_wr_desc;
-  logic abort_ff;
-
-  // 检查DMA描述符的配置信息
-  function automatic logic check_cfg();
-    logic [`DMA_NUM_DESC-1:0] valid_desc;
-
-    valid_desc = '0;
-
-    for (int i=0; i<`DMA_NUM_DESC; i++) begin
-      if (dma_desc_i[i].enable) begin
-        valid_desc[i] = (|dma_desc_i[i].num_bytes);
-      end
-    end
-    return |valid_desc;
-  endfunction
 
   // DMA的状态机逻辑
   always_comb begin : fsm_dma_ctrl
@@ -56,16 +39,8 @@ module dma_fsm
 
     case (cur_st_ff)
       DMA_ST_IDLE: begin
-        if (dma_ctrl_i.go) begin
-          next_st = DMA_ST_CFG;
-        end
-      end
-      DMA_ST_CFG: begin
-        if (~dma_ctrl_i.abort_req && check_cfg()) begin
+        if (dma_go_i) begin
           next_st = DMA_ST_RUN;
-        end
-        else begin
-          next_st = DMA_ST_DONE;
         end
       end
       DMA_ST_RUN: begin
@@ -77,14 +52,13 @@ module dma_fsm
         end
       end
       DMA_ST_DONE: begin
-        if (dma_ctrl_i.go) begin
+        if(dma_go_i) begin
           next_st = DMA_ST_DONE;
         end
       end
     endcase
   end : fsm_dma_ctrl
 
-  /* verilator lint_off WIDTH */
   // rd 和 wr 是 DMA Streamer的读写逻辑
   always_comb begin : rd_streamer
     // interface between DMA FSM and DMA Streamer
@@ -94,16 +68,13 @@ module dma_fsm
     dma_active_o      = (cur_st_ff == DMA_ST_RUN);
 
     if (cur_st_ff == DMA_ST_RUN) begin
-      for (int i=0; i<`DMA_NUM_DESC; i++) begin
-        if (dma_desc_i[i].enable && (|dma_desc_i[i].num_bytes) && (~rd_desc_done_ff[i])) begin
-          dma_stream_rd_o.idx   = i;
-          dma_stream_rd_o.valid = ~abort_ff;
-          break;
-        end
+      if((|dma_desc_i.num_bytes) && (~rd_desc_done_ff)) begin
+        dma_stream_rd_o.idx = 0;
+        dma_stream_rd_o.valid = 1'b1;
       end
 
       if (dma_stream_rd_i.done) begin
-        next_rd_desc_done[dma_stream_rd_o.idx] = 1'b1;
+        next_rd_desc_done = 1'b1;
       end
 
       pending_rd_desc = dma_stream_rd_o.valid;
@@ -120,16 +91,13 @@ module dma_fsm
     pending_wr_desc   = 1'b0;
 
     if (cur_st_ff == DMA_ST_RUN) begin
-      for (int i=0; i<`DMA_NUM_DESC; i++) begin
-        if (dma_desc_i[i].enable && (|dma_desc_i[i].num_bytes) && (~wr_desc_done_ff[i])) begin
-          dma_stream_wr_o.idx   = i;
-          dma_stream_wr_o.valid = ~abort_ff;
-          break;
-        end
+      if((|dma_desc_i.num_bytes) && (~wr_desc_done_ff)) begin
+        dma_stream_wr_o.idx = 0;
+        dma_stream_wr_o.valid = 1'b1;
       end
 
       if (dma_stream_wr_i.done) begin
-        next_wr_desc_done[dma_stream_wr_o.idx] = 1'b1;
+        next_wr_desc_done = 1'b1;
       end
 
       pending_wr_desc = dma_stream_wr_o.valid;
@@ -139,7 +107,6 @@ module dma_fsm
       next_wr_desc_done = '0;
     end
   end : wr_streamer
-  /* verilator lint_on WIDTH */
 
   // DMA 状态的更新和错误信息的处理
   always_comb begin : dma_status
@@ -161,13 +128,11 @@ module dma_fsm
       cur_st_ff       <= dma_st_t'('0);
       rd_desc_done_ff <= '0;
       wr_desc_done_ff <= '0;
-      abort_ff        <= '0;
     end
     else begin
       cur_st_ff       <= next_st;
       rd_desc_done_ff <= next_rd_desc_done;
       wr_desc_done_ff <= next_wr_desc_done;
-      abort_ff        <= dma_ctrl_i.abort_req;
     end
   end
 endmodule

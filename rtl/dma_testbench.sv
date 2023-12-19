@@ -13,8 +13,8 @@ logic reset_n_mem;
 logic reset_n_bfm;
 logic reset_dma;
 
-s_dma_control_t                   dma_ctrl;
-s_dma_desc_t [`DMA_NUM_DESC-1:0]  dma_desc;
+logic                             dma_go_i;
+s_dma_desc_t                      dma_desc;
 s_dma_error_t                     dma_error;
 s_dma_status_t                    dma_stats;
 
@@ -32,7 +32,7 @@ dma_func_wrapper u_dma (
   .clk              (clk           ),
   .rst              (reset_dma     ),
   // From/To CSRs
-  .dma_ctrl_i       (dma_ctrl      ),
+  .dma_go_i         (dma_go_i      ),
   .dma_desc_i       (dma_desc      ),
   .dma_stats_o      (dma_stats     ),
   .dma_error_o      (dma_error     ),
@@ -44,9 +44,9 @@ dma_func_wrapper u_dma (
 cdn_axi4_master_bfm_wrapper#(
   .NAME({"MASTER_BFM"}),
   .DATA_BUS_WIDTH(DATA_BUS_WIDTH),
-  .ADDRESS_BUS_WIDTH(ADDRESS_BUS_WIDTH),
+  .ADDRESS_BUS_WIDTH(32),
   .ID_BUS_WIDTH(ID_BUS_WIDTH),
-  .MAX_OUTSTANDING_TRANSACTIONS(MAX_OUTSTANDING_TRANSACTIONS)
+  .MAX_OUTSTANDING_TRANSACTIONS(8)
 ) u_axi4_master_bfm (
   .aclk       (clk           ),
   .aresetn    (reset_n_bfm   ),
@@ -58,7 +58,7 @@ axi4_memory_wrapper#(
   .useSMICModel           (0),
   .MEMORY_NAME            ("RAM_MODEL"),
   .DATA_WIDTH             (DATA_BUS_WIDTH),
-  .ADDRESS_WIDTH          (ADDRESS_BUS_WIDTH),
+  .ADDRESS_WIDTH          (32),
   .ID_WIDTH               (ID_BUS_WIDTH),
   .MEMORY_SPACE_START_ADDR(RAM_START_ADDR),
   .MEMORY_SPACE_END_ADDR  (RAM_END_ADDR),
@@ -108,20 +108,15 @@ initial begin
 
   #50
   $display("[%0t]: Change memory control source to DMA...", $time);
-  // reset_n_bfm           = 1'b0;
   master_ctrl           = 1'b1;
-  dma_ctrl.abort_req    = 0;
-  dma_ctrl.max_burst    = 8'hff;
-  dma_desc[0].src_addr  = TRANSFER_SRC;
-  dma_desc[0].dst_addr  = TRANSFER_DST;
-  dma_desc[0].num_bytes = 32'h40; // 64byte
-  dma_desc[0].wr_mode   = DMA_MODE_INCR;
-  dma_desc[0].rd_mode   = DMA_MODE_INCR;
-  dma_desc[0].enable    = 1'b1;
+  dma_desc.src_addr  = TRANSFER_SRC;
+  dma_desc.dst_addr  = TRANSFER_DST;
+  dma_desc.num_bytes = 32'h40; // 64byte
+
+  $display("[%0t]: Enable DMA to transfer data...", $time);
+  dma_go_i       = 1'b1;
 
   #10
-  $display("[%0t]: Enable DMA to transfer data...", $time);
-  dma_ctrl.go = 1'b1;
 
   repeat(50) begin
   @(posedge clk);
@@ -132,7 +127,6 @@ initial begin
   end
 
   $display("[%0t]: Change memory control source to BFM...", $time);
-  // reset_n_bfm = 1'b1;
   master_ctrl = 1'b0;
   u_axi4_master_bfm.BFM_READ_BURST64(TRANSFER_DST,32'h0000_0000,response512,`ENABLE_MESSAGE);
 
@@ -141,10 +135,8 @@ initial begin
 end
 
 initial begin
-    `ifdef DUMP_VCD
-      $vcdplusfile("dma_test.vpd");
-      $vcdpluson;
-    `endif
+  $vcdplusfile("dma_tb.vpd");
+  $vcdpluson;
 end // Dump waveforms
 
 endmodule: dma_tb

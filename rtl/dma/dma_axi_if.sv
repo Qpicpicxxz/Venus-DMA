@@ -1,8 +1,6 @@
 module dma_axi_if
-  // import dma_utils_pkg::*;
   import axi_pkg::*;
   import dma_pkg::*;
-  // import amba_axi_pkg::*;
 (
   input                     clk,
   input                     rst,
@@ -12,8 +10,6 @@ module dma_axi_if
   input   s_dma_axi_req_t   dma_axi_wr_req_i,
   output  s_dma_axi_resp_t  dma_axi_wr_resp_o,
   // Master AXI I/F
-  // output  s_axi_mosi_t      dma_mosi_o,
-  // input   s_axi_miso_t      dma_miso_i,
   output  axi_req_t         dma_axi_req_o,
   input   axi_resp_t        dma_axi_resp_i,
   // From/To FIFOs interface
@@ -23,13 +19,12 @@ module dma_axi_if
   output  logic             axi_pend_txn_o,
   output  s_dma_error_t     axi_dma_err_o,
   input                     clear_dma_i,
-  input                     dma_abort_i,
   input                     dma_active_i
 );
 
   pend_rd_t     rd_counter_ff, next_rd_counter;
   pend_wr_t     wr_counter_ff, next_wr_counter;
-  axi_strb_t rd_txn_last_strb;
+  axi_strb_t    rd_txn_last_strb;
   logic         rd_txn_hpn;
   logic         wr_txn_hpn;
   logic         rd_resp_hpn;
@@ -114,7 +109,7 @@ module dma_axi_if
   //***************************************************
   dma_fifo #(
     .SLOTS  (`DMA_RD_TXN_BUFF),
-    .WIDTH  (`DMA_ADDR_WIDTH)
+    .WIDTH  (32)
   ) u_fifo_rd_error (
     .clk    (clk),
     .rst    (rst),
@@ -132,7 +127,7 @@ module dma_axi_if
 
   dma_fifo #(
     .SLOTS  (`DMA_WR_TXN_BUFF),
-    .WIDTH  (`DMA_ADDR_WIDTH)
+    .WIDTH  (32)
   ) u_fifo_wr_error (
     .clk    (clk),
     .rst    (rst),
@@ -264,12 +259,12 @@ module dma_axi_if
         dma_axi_req_o.ar.araddr  = dma_axi_rd_req_i.addr;
         dma_axi_req_o.ar.arlen   = dma_axi_rd_req_i.alen;
         dma_axi_req_o.ar.arsize  = dma_axi_rd_req_i.size;
-        dma_axi_req_o.ar.arburst = (dma_axi_rd_req_i.mode == DMA_MODE_INCR) ? 2'b01 : 2'b00;
+        dma_axi_req_o.ar.arburst = 2'b01;  // INCR传输
       end
       // Read Data Channel - R*
-      dma_axi_req_o.rready = (~dma_fifo_resp_i.full || dma_abort_i); // Available to recv if we're not full or there's an abort in progress
-      if (dma_axi_resp_i.rvalid && (~dma_fifo_resp_i.full || dma_abort_i)) begin
-        dma_fifo_req_o.wr      = dma_abort_i ? 1'b0 : 1'b1; // Ignore incoming data in case of abort
+      dma_axi_req_o.rready = (~dma_fifo_resp_i.full);
+      if (dma_axi_resp_i.rvalid && (~dma_fifo_resp_i.full)) begin
+        dma_fifo_req_o.wr      = 1'b1;
         dma_fifo_req_o.data_wr = apply_strb(dma_axi_resp_i.r.rdata, rd_txn_last_strb);
         if (dma_axi_resp_i.r.rlast && dma_axi_req_o.rready) begin
           rd_err_hpn = (dma_axi_resp_i.r.rresp == 2'b10) ||
@@ -288,18 +283,18 @@ module dma_axi_if
       //    We could potentially put awvalid back to low if dma_fifo gets empty
       //    while we are waiting for awready from the slave
       dma_axi_req_o.awvalid = (wr_counter_ff < `DMA_WR_TXN_BUFF) ? ((dma_axi_wr_req_i.valid &&
-                           (~dma_fifo_resp_i.empty || dma_abort_i)) || aw_txn_started_ff) : 1'b0;
+                           (~dma_fifo_resp_i.empty)) || aw_txn_started_ff) : 1'b0;
       if (dma_axi_req_o.awvalid) begin
         dma_axi_wr_resp_o.ready = dma_axi_resp_i.awready;
         dma_axi_req_o.aw.awaddr  = dma_axi_wr_req_i.addr;
         dma_axi_req_o.aw.awlen   = dma_axi_wr_req_i.alen;
         dma_axi_req_o.aw.awsize  = dma_axi_wr_req_i.size;
-        dma_axi_req_o.aw.awburst = (dma_axi_wr_req_i.mode == DMA_MODE_INCR) ? 2'b01 : 2'b00;
+        dma_axi_req_o.aw.awburst = 2'b01;  // INCR传输
         next_aw_txn        = ~dma_axi_resp_i.awready; // Ensures we respect valid / ready AMBA protocol
       end
       // Write Data Channel - W*
-      if (~wr_data_req_empty && (~dma_fifo_resp_i.empty || dma_abort_i)) begin
-        dma_fifo_req_o.rd = dma_abort_i ? 1'b0 : dma_axi_resp_i.wready; // Ignore fifo content in case of abort
+      if (~wr_data_req_empty && (~dma_fifo_resp_i.empty)) begin
+        dma_fifo_req_o.rd = dma_axi_resp_i.wready;
         dma_axi_req_o.w.wdata  = dma_fifo_resp_i.data_rd;
         dma_axi_req_o.w.wstrb  = wr_data_req_out.wstrb;
         dma_axi_req_o.w.wlast  = (beat_counter_ff == wr_data_req_out.alen);

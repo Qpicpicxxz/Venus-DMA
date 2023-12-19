@@ -1,23 +1,21 @@
 package dma_pkg;
 import axi_pkg::*;
 `define DMA_DATA_WIDTH        DATA_BUS_WIDTH
-`define DMA_ADDR_WIDTH        ADDRESS_BUS_WIDTH
 `define DMA_NUM_DESC          2
 `define DMA_BYTES_WIDTH       32
 `define DMA_RD_TXN_BUFF       8 // Must be power of 2
 `define DMA_WR_TXN_BUFF       8 // Must be power of 2
 // FIFO size in bytes = (DMA_FIFO_DEPTH*(AXI_DATA_WIDTH/8))
 `define DMA_FIFO_DEPTH        16 // Must be power of 2
-`define DMA_ID_WIDTH        `AXI_TXN_ID_WIDTH
-`define DMA_MAX_BEAT_BURST  256 // 1 up to 256
-`define DMA_EN_UNALIGNED    1
-`define DMA_MAX_BURST_EN    1
+`define DMA_ID_WIDTH          `AXI_TXN_ID_WIDTH
+`define DMA_MAX_BEAT_BURST    256 // 1 up to 256
+`define DMA_MAX_BURST_EN      1
 
+// DMA_FIFO_DEPTH = 16 | FIFO_WIDTH = 4
 localparam FIFO_WIDTH = $clog2(`DMA_FIFO_DEPTH>1?`DMA_FIFO_DEPTH:2);
-typedef logic [`DMA_ADDR_WIDTH-1:0]         desc_addr_t;
+typedef logic [31:0]                        desc_addr_t;
 typedef logic [`DMA_BYTES_WIDTH-1:0]        desc_num_t;
 typedef logic [7:0]                         maxb_t;
-typedef logic [$clog2(`DMA_NUM_DESC)-1:0]   idx_desc_t;
 typedef logic [FIFO_WIDTH:0]                fifo_sz_t;
 typedef logic [$clog2(`DMA_RD_TXN_BUFF):0]  pend_rd_t;
 typedef logic [$clog2(`DMA_WR_TXN_BUFF):0]  pend_wr_t;
@@ -39,24 +37,18 @@ typedef enum logic {
 
 typedef enum logic [1:0] {
   DMA_ST_IDLE,
-  DMA_ST_CFG,
   DMA_ST_RUN,
   DMA_ST_DONE
 } dma_st_t;
-
-typedef enum logic {
-  DMA_MODE_INCR,
-  DMA_MODE_FIXED
-} dma_mode_t;
 
 // Interface between DMA FSM / Streamer and DMA CSR
 typedef struct packed {
   desc_addr_t src_addr;
   desc_addr_t dst_addr;
   desc_num_t  num_bytes;
-  dma_mode_t  wr_mode;
-  dma_mode_t  rd_mode;
-  logic       enable;
+  // dma_mode_t  wr_mode;
+  // dma_mode_t  rd_mode;
+  // logic       enable;
 } s_dma_desc_t;
 
 typedef struct packed {
@@ -67,12 +59,6 @@ typedef struct packed {
 } s_dma_error_t;
 
 typedef struct packed {
-  logic       go;         // sets the start for the DMA operation
-  logic       abort_req;  // stop DMA operation
-  maxb_t      max_burst;  // max burst length (ALEN) in the AXI txn
-} s_dma_control_t;
-
-typedef struct packed {
   logic       error;
   logic       done;
 } s_dma_status_t;
@@ -80,7 +66,7 @@ typedef struct packed {
 // Interface between DMA FSM and DMA Streamer
 typedef struct packed {
   logic       valid;
-  idx_desc_t  idx;
+  logic       idx;
 } s_dma_str_in_t;
 
 typedef struct packed {
@@ -90,10 +76,9 @@ typedef struct packed {
 // Interface between DMA Streamer and DMA AXI
 typedef struct packed {
   axi_addr_t    addr;
-  axi_len_t    alen;
+  axi_len_t     alen;
   axi_size_t    size;
-  axi_strb_t strb;
-  dma_mode_t    mode;
+  axi_strb_t    strb;
   logic         valid;
 } s_dma_axi_req_t;
 
@@ -120,7 +105,7 @@ typedef struct packed {
 // write txns
 typedef struct packed {
   axi_len_t    alen;
-  axi_strb_t wstrb;
+  axi_strb_t   wstrb;
 } s_wr_req_t;
 
 endpackage
