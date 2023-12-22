@@ -13,23 +13,25 @@ module dma_streamer
   output  s_dma_axi_req_t                   dma_axi_req_o,
   input   s_dma_axi_resp_t                  dma_axi_resp_i,
   // To/From DMA FSM
-  input   s_dma_str_in_t                    dma_stream_i,
-  output  s_dma_str_out_t                   dma_stream_o
+  input   logic                             dma_stream_valid_i,
+  output  logic                             dma_stream_done_o
 );
-  localparam bytes_p_burst = (`DMA_DATA_WIDTH/8); // bytes_p_burst = 512bit / 8 = 64byte 一次突发传输64byte的数据
+  // bytes_p_burst = 512bit / 8 = 64byte 一次突发传输64byte的数据
+  localparam bytes_p_burst = (`DMA_DATA_WIDTH/8);
+
+  // 256 * (512 / 8) = 16384 = 128^2
+  // 每次突发事物最多可能传输16384bytes的数据，计算`txn_bytes`需要的位宽
   localparam max_txn_width = $clog2(`DMA_MAX_BEAT_BURST*(`DMA_DATA_WIDTH/8));
+  typedef logic [max_txn_width:0] max_bytes_t;
+  max_bytes_t     txn_bytes;
 
   dma_sm_t    cur_st_ff,      next_st;
   axi_addr_t  desc_addr_ff,   next_desc_addr;
   desc_num_t  desc_bytes_ff,  next_desc_bytes;
 
-  typedef logic [max_txn_width:0] max_bytes_t;
-
   s_dma_axi_req_t dma_req_ff, next_dma_req;
-  max_bytes_t     txn_bytes;
 
   logic last_txn_ff, next_last_txn;
-  logic [3:0] num_unalign_bytes;
   logic       last_txn_proc;
 
   function automatic logic burst_r4KB(axi_addr_t base, axi_addr_t fut);
@@ -71,7 +73,8 @@ module dma_streamer
     next_st = DMA_ST_SM_IDLE;
     case (cur_st_ff)
       DMA_ST_SM_IDLE: begin
-        if (dma_stream_i.valid) begin
+        // if (dma_stream_i.valid) begin
+        if(dma_stream_valid_i) begin
           next_st = DMA_ST_SM_RUN;
         end
       end
@@ -79,6 +82,7 @@ module dma_streamer
         if (desc_bytes_ff > 0) begin
           next_st = DMA_ST_SM_RUN;
         end
+        // 是最后一个事物但是slave还没有ready
         else if (last_txn_ff && ~dma_axi_resp_i.ready) begin
           next_st = DMA_ST_SM_RUN;
         end
@@ -86,15 +90,15 @@ module dma_streamer
     endcase
   end : streamer_dma_ctrl
 
+  // Streamer负责计算突发次数等
   always_comb begin : burst_calc
-    dma_stream_o      = s_dma_str_out_t'('0);
+    dma_stream_done_o = 1'b0;
     next_dma_req      = dma_req_ff;
     next_desc_addr    = desc_addr_ff;
     next_desc_bytes   = desc_bytes_ff;
     dma_axi_req_o     = dma_req_ff;
     next_last_txn     = last_txn_ff;
     last_txn_proc     = 1'b0;
-    num_unalign_bytes = '0;
 
     // Initialize Stream operation
     if ((cur_st_ff == DMA_ST_SM_IDLE) && (next_st == DMA_ST_SM_RUN)) begin
@@ -118,17 +122,16 @@ module dma_streamer
       // - Not the last one
       if ((~dma_req_ff.valid || (dma_req_ff.valid && dma_axi_resp_i.ready)) && ~last_txn_ff) begin
         // Best case, send as much as possible through a single txn
-        // respecting the 4KB boundary and burst type INCR/FIXED
         next_dma_req.addr = desc_addr_ff;    // TODO: 在这里可以进行地址对齐
         next_dma_req.size = axi_size_t'(6);  // TODO: 在这里可以配置size
 
         next_dma_req.alen = great_alen(desc_addr_ff, desc_bytes_ff);
         next_dma_req.strb = '1;              // TODO: 在这里可以配置strb
 
-        txn_bytes = max_bytes_t'((next_dma_req.alen+8'd1)*bytes_p_burst);
-        next_desc_bytes = desc_bytes_ff - desc_num_t'(txn_bytes);
-        next_last_txn   = (next_desc_bytes == '0);
-        next_desc_addr = desc_addr_ff + axi_addr_t'(txn_bytes);  // TODO: 在这里可以配置自增步长
+        txn_bytes         = max_bytes_t'((next_dma_req.alen+8'd1)*bytes_p_burst);
+        next_desc_bytes   = desc_bytes_ff - desc_num_t'(txn_bytes);
+        next_last_txn     = (next_desc_bytes == '0);
+        next_desc_addr    = desc_addr_ff + axi_addr_t'(txn_bytes);  // TODO: 在这里可以配置自增步长
 
         next_dma_req.valid = 1'b1;
       end
@@ -146,7 +149,7 @@ module dma_streamer
       end
     end
 
-    dma_stream_o.done = ((cur_st_ff == DMA_ST_SM_RUN) && (next_st == DMA_ST_SM_IDLE));
+    dma_stream_done_o = ((cur_st_ff == DMA_ST_SM_RUN) && (next_st == DMA_ST_SM_IDLE));
   end : burst_calc
 
   always_ff @ (posedge clk) begin

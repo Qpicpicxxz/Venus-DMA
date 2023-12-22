@@ -1,9 +1,12 @@
 module dma_tb ();
+`include  "test_data_generator.svh"
 parameter RAM_START_ADDR = 32'h1000_0000;
 parameter RAM_END_ADDR   = 32'h1fff_ffff;
 parameter RAM_SIZE       = 32'h1000_0000;
-parameter TRANSFER_SRC   = 32'h1100_0000;
-parameter TRANSFER_DST   = 32'h1200_0000;
+parameter TRANSFER_SRC_1   = 32'h1100_0000;
+parameter TRANSFER_DST_1   = 32'h1200_0000;
+parameter TRANSFER_SRC_2   = 32'h1300_0000;
+parameter TRANSFER_DST_2   = 32'h1400_0000;
 
 import axi_pkg::*;
 import dma_pkg::*;
@@ -26,8 +29,6 @@ axi_resp_t axi_resp_i_dma;
 axi_resp_t axi_resp_i_bfm;
 axi_resp_t axi_resp_i;
 
-logic [511:0] response512;
-
 dma_func_wrapper u_dma (
   .clk              (clk           ),
   .rst              (reset_dma     ),
@@ -37,8 +38,8 @@ dma_func_wrapper u_dma (
   .dma_stats_o      (dma_stats     ),
   .dma_error_o      (dma_error     ),
   // Master AXI I/F
-  .dma_axi_req_o    (axi_req_o_dma ),
-  .dma_axi_resp_i   (axi_resp_i_dma)
+  .axi_req_o        (axi_req_o_dma ),
+  .axi_resp_i       (axi_resp_i_dma)
 );
 
 cdn_axi4_master_bfm_wrapper#(
@@ -90,47 +91,67 @@ initial begin
   $display("[%0t]: Reseting all module...", $time);
   clk = 1'b1;
   reset_n_mem = 1'b0;
-  #10
+  repeat(10) @(posedge clk);
   reset_n_bfm = 1'b0;
   reset_dma   = 1'b1;
-  #50
+  repeat(50) @(posedge clk);
   $display("[%0t]: Stop reseting...", $time);
   reset_n_mem = 1'b1;
   reset_n_bfm = 1'b1;
   reset_dma   = 1'b0;
 
-  #10
+  repeat(10) @(posedge clk);
   $display("[%0t]: Memory initializing...", $time);
   master_ctrl = 1'b0;
-  // 64byte = 512bit
-  u_axi4_master_bfm.BFM_WRITE_BURST64(TRANSFER_SRC,32'h0000_0000,{2{256'h5724_3542_3524_5245_2452_5542_5763_0157_9175_6418_5541_2318_4543_6873_5629_5890}},`ENABLE_MESSAGE);
+  // 2048bytes = 16384bits
+  u_axi4_master_bfm.BFM_WRITE_BURST2048(TRANSFER_SRC_1,32'h0000_0000,TESTDATA16384bits_1,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_WRITE_BURST2048(TRANSFER_SRC_2,32'h0000_0000,TESTDATA16384bits_2,`ENABLE_MESSAGE);
   $display("[%0t]: Memory initialization done.", $time);
 
-  #50
+  repeat(50) @(posedge clk);
   $display("[%0t]: Change memory control source to DMA...", $time);
   master_ctrl           = 1'b1;
-  dma_desc.src_addr  = TRANSFER_SRC;
-  dma_desc.dst_addr  = TRANSFER_DST;
-  dma_desc.num_bytes = 32'h40; // 64byte
+  dma_desc.src_addr  = TRANSFER_SRC_1;
+  dma_desc.dst_addr  = TRANSFER_DST_1;
+  dma_desc.num_bytes = 32'h800; // 2048byte
 
-  $display("[%0t]: Enable DMA to transfer data...", $time);
+  $display("[%0t]: Enable DMA to transfer data 1...", $time);
   dma_go_i       = 1'b1;
-
-  #10
+  repeat(1) @(posedge clk);
+  dma_go_i       = 1'b0;
+  repeat(10) @(posedge clk);
 
   repeat(50) begin
   @(posedge clk);
   if (dma_stats.done == 1'b1) begin
-      $display("[%0t]: DMA transfer completed...", $time);
+      $display("[%0t]: DMA transfer completed 1...", $time);
+      break;
+    end
+  end
+
+  dma_desc.src_addr  = TRANSFER_SRC_2;
+  dma_desc.dst_addr  = TRANSFER_DST_2;
+  dma_desc.num_bytes = 32'h800; // 2048byte
+
+  $display("[%0t]: Enable DMA to transfer data 2...", $time);
+  dma_go_i       = 1'b1;
+  repeat(1) @(posedge clk);
+  dma_go_i       = 1'b0;
+  repeat(10) @(posedge clk);
+
+  repeat(50) begin
+  @(posedge clk);
+  if (dma_stats.done == 1'b1) begin
+      $display("[%0t]: DMA transfer completed 2...", $time);
       break;
     end
   end
 
   $display("[%0t]: Change memory control source to BFM...", $time);
   master_ctrl = 1'b0;
-  u_axi4_master_bfm.BFM_READ_BURST64(TRANSFER_DST,32'h0000_0000,response512,`ENABLE_MESSAGE);
-
-  #50
+  u_axi4_master_bfm.BFM_READ_BURST2048(TRANSFER_DST_1,32'h0000_0000,response16384,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_READ_BURST2048(TRANSFER_DST_2,32'h0000_0000,response16384,`ENABLE_MESSAGE);
+  repeat(50) @(posedge clk);
   $finish;
 end
 

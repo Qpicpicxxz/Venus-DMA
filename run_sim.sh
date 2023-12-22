@@ -22,6 +22,7 @@ VERDI_PATH="/home/software/synopsys/verdi/O-2018.09-SP2-11/share/PLI/VCS/linux64
 echo "compiling..."
 
 # vlogan是Synopsys的Verilog编译器和分析工具
+# `-`：一般是编译时用的，编译工具自带的 ｜ `+`：一般是插件、环境、验证语言等，可以扩展和自定义的
 # `-full64`：支持64位模式下的编译仿真
 # `-kdb`：生成verdi KDB数据库
 # `-sverilog`：支持SystemVerilog

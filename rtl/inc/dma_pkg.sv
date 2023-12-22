@@ -15,15 +15,9 @@ import axi_pkg::*;
 localparam FIFO_WIDTH = $clog2(`DMA_FIFO_DEPTH>1?`DMA_FIFO_DEPTH:2);
 typedef logic [31:0]                        desc_addr_t;
 typedef logic [`DMA_BYTES_WIDTH-1:0]        desc_num_t;
-typedef logic [7:0]                         maxb_t;
 typedef logic [FIFO_WIDTH:0]                fifo_sz_t;
 typedef logic [$clog2(`DMA_RD_TXN_BUFF):0]  pend_rd_t;
 typedef logic [$clog2(`DMA_WR_TXN_BUFF):0]  pend_wr_t;
-
-typedef enum logic {
-  DMA_ERR_CFG,
-  DMA_ERR_OPE
-} err_type_t;
 
 typedef enum logic {
   DMA_ERR_RD,
@@ -46,14 +40,10 @@ typedef struct packed {
   desc_addr_t src_addr;
   desc_addr_t dst_addr;
   desc_num_t  num_bytes;
-  // dma_mode_t  wr_mode;
-  // dma_mode_t  rd_mode;
-  // logic       enable;
 } s_dma_desc_t;
 
 typedef struct packed {
   desc_addr_t addr;
-  err_type_t  type_err;
   err_src_t   src;
   logic       valid;
 } s_dma_error_t;
@@ -62,16 +52,6 @@ typedef struct packed {
   logic       error;
   logic       done;
 } s_dma_status_t;
-
-// Interface between DMA FSM and DMA Streamer
-typedef struct packed {
-  logic       valid;
-  logic       idx;
-} s_dma_str_in_t;
-
-typedef struct packed {
-  logic       done;
-} s_dma_str_out_t;
 
 // Interface between DMA Streamer and DMA AXI
 typedef struct packed {
@@ -101,10 +81,15 @@ typedef struct packed {
   logic       empty;
 } s_dma_fifo_resp_t;
 
-// Used in the DMA AXI I/F for buffering
-// write txns
+// Streamer - AXI IF 之间寄存传输信息
 typedef struct packed {
-  axi_len_t    alen;
+  axi_addr_t   raddr;
+  axi_strb_t   rstrb;   // 备用[原本用来应对地址unligned情况的]
+} s_rd_req_t;
+
+typedef struct packed {
+  axi_addr_t   waddr;
+  axi_len_t    awlen;
   axi_strb_t   wstrb;
 } s_wr_req_t;
 

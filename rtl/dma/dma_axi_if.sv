@@ -1,53 +1,75 @@
+/* DMA to AXI Interface */
 module dma_axi_if
   import axi_pkg::*;
   import dma_pkg::*;
 (
   input                     clk,
   input                     rst,
+
   // From/To Streamers
+  // `s_dma_axi_req_t` : addr | alen | size | strb | valid
+  // `s_dma_axi_resp_t`: ready
   input   s_dma_axi_req_t   dma_axi_rd_req_i,
   output  s_dma_axi_resp_t  dma_axi_rd_resp_o,
   input   s_dma_axi_req_t   dma_axi_wr_req_i,
   output  s_dma_axi_resp_t  dma_axi_wr_resp_o,
+
   // Master AXI I/F
-  output  axi_req_t         dma_axi_req_o,
-  input   axi_resp_t        dma_axi_resp_i,
+  output  axi_req_t         axi_req_o,
+  input   axi_resp_t        axi_resp_i,
+
   // From/To FIFOs interface
+  // `s_dma_fifo_req_t` : wr | rd | data_wr
+  // `s_dma_fifo_resp_t`: data_rd | ocup | space | full | empty
   output  s_dma_fifo_req_t  dma_fifo_req_o,
   input   s_dma_fifo_resp_t dma_fifo_resp_i,
+
   // From/To DMA FSM
   output  logic             axi_pend_txn_o,
   output  s_dma_error_t     axi_dma_err_o,
   input                     clear_dma_i,
   input                     dma_active_i
 );
+  /*
+   * [arvalid] - master要读的地址有效
+   * [arready] - slave准备好接收master要读的地址
+   * [rvalid]  - slave要被读的地址数据有效
+   * [r.rlast] - slave发出的表示最后一拍读数据的操作
+   * [rready]  - master准备好接收slave发来的读的数据
+   * [awvalid] - master要写的地址有效
+   * [awready] - slave准备好接收master要写的地址
+   * [wvalid]  - master要写的数据有效
+   * [w.wlast] - master发出的表示最后一拍写数据的操作
+   * [wready]  - slave准备好接收master写过来的数据
+   * [bvalid]  - 写入slave的数据有效
+   * [bready]  - 要写入slave的master数据已经准备好
+   */
 
-  pend_rd_t     rd_counter_ff, next_rd_counter;
-  pend_wr_t     wr_counter_ff, next_wr_counter;
-  axi_strb_t    rd_txn_last_strb;
-  logic         rd_txn_hpn;
-  logic         wr_txn_hpn;
-  logic         rd_resp_hpn;
-  logic         wr_resp_hpn;
+  /* 寄存器 */
+  logic         axi_txn_pend_ff, next_axi_txn_pend; // DMA工作状态寄存
+  s_rd_req_t    rd_txn_req_ff,   next_rd_txn_req;   // Stream传来的读操作信息寄存 | `s_rd_req_t`: raddr[读地址] ｜ rstrb[掩码]
+  s_wr_req_t    wr_txn_req_ff,   next_wr_txn_req;   // Stream传来的写操作信息寄存 | `s_wr_req_t`: waddr[写地址] ｜ awlen[次数] | wstrb[掩码]
+  /* 握手交互信号 */
+  logic         rd_txn_hpn;  // Read地址握手成功[开始读]  | arvalid && arready
+  logic         rd_resp_hpn; // Read事物响应成功[读完了]  | rvalid && r.rlast && rready
+  logic         wr_txn_hpn;  // Write事物握手成功[开始写] | awvalid && awready
+  logic         wr_resp_hpn; // Write事物响应成功[写成功] | bvalid && bready
+  /* 错误发生相关 */
   logic         rd_err_hpn;
   logic         wr_err_hpn;
-  axi_addr_t    rd_txn_addr;
-  axi_addr_t    wr_txn_addr;
   logic         err_lock_ff, next_err_lock;
-  logic         wr_data_txn_hpn;
-  logic         wr_lock_ff, next_wr_lock;
-  logic         wr_new_txn;
+  s_dma_error_t dma_error_ff, next_dma_error;
+  /* 记录写打拍，决定什么时候拉高w.wlast */
   logic         wr_beat_hpn;
-  logic         wr_data_req_empty;
+  axi_len_t     beat_counter_ff, next_beat_count;
+  /* 寄存写事物传输状态[如果slave的awready消失了] */
   logic         aw_txn_started_ff, next_aw_txn;
 
-  s_wr_req_t    wr_data_req_in, wr_data_req_out;
-  axi_len_t    beat_counter_ff, next_beat_count;
 
-  s_dma_error_t dma_error_ff, next_dma_error;
-
+  // 掩码[63:0] apply to 数据[511:0] ｜ mask[0] = 1 -> data[7:0] is valid
   function automatic axi_data_t apply_strb(axi_data_t data, axi_strb_t mask);
     axi_data_t out_data;
+    // 遍历mask的每一位
     for (int i=0; i<$bits(axi_strb_t); i++) begin
       if (mask[i] == 1'b1) begin
         out_data[(8*i)+:8] = data[(8*i)+:8];
@@ -59,273 +81,161 @@ module dma_axi_if
     return out_data;
   endfunction
 
-  //***************************************************
-  // Queue the txn from the wr streamer to send in the
-  // data channel
-  //***************************************************
-  dma_fifo #(
-    .SLOTS  (`DMA_WR_TXN_BUFF),
-    .WIDTH  ($bits(s_wr_req_t))
-  ) u_fifo_wr_data (
-    .clk    (clk),
-    .rst    (rst),
-    .write_i(wr_new_txn),
-    .read_i (wr_data_txn_hpn),
-    .data_i (wr_data_req_in),
-    .data_o (wr_data_req_out),
-    .error_o(),
-    .full_o (),
-    .empty_o(wr_data_req_empty),
-    .ocup_o (),
-    .clear_i(1'b0),
-    .free_o ()
-  );
-
-  //***************************************************
-  // Stores the strb mask used in case of unaligned
-  // start/end addresses for reads
-  //***************************************************
-  dma_fifo #(
-    .SLOTS  (`DMA_RD_TXN_BUFF),
-    .WIDTH  ($bits(axi_strb_t))
-  ) u_fifo_rd_strb (
-    .clk    (clk),
-    .rst    (rst),
-    .write_i(rd_txn_hpn),
-    .read_i (rd_resp_hpn),
-    .data_i (dma_axi_rd_req_i.strb),
-    .data_o (rd_txn_last_strb),
-    .error_o(),
-    .full_o (),
-    .empty_o(),
-    .ocup_o (),
-    .clear_i(1'b0),
-    .free_o ()
-  );
-
-  //***************************************************
-  // Stores the address of the txn that were dispatched
-  // for further logging in case of error
-  //***************************************************
-  dma_fifo #(
-    .SLOTS  (`DMA_RD_TXN_BUFF),
-    .WIDTH  (32)
-  ) u_fifo_rd_error (
-    .clk    (clk),
-    .rst    (rst),
-    .write_i(rd_txn_hpn),
-    .read_i (rd_resp_hpn),
-    .data_i (dma_axi_rd_req_i.addr),
-    .data_o (rd_txn_addr),
-    .error_o(),
-    .full_o (),
-    .empty_o(),
-    .ocup_o (),
-    .clear_i(1'b0),
-    .free_o ()
-  );
-
-  dma_fifo #(
-    .SLOTS  (`DMA_WR_TXN_BUFF),
-    .WIDTH  (32)
-  ) u_fifo_wr_error (
-    .clk    (clk),
-    .rst    (rst),
-    .write_i(wr_txn_hpn),
-    .read_i (wr_resp_hpn),
-    .data_i (dma_axi_wr_req_i.addr),
-    .data_o (wr_txn_addr),
-    .error_o(),
-    .full_o (),
-    .empty_o(),
-    .ocup_o (),
-    .clear_i(1'b0),
-    .free_o ()
-  );
-
   always_comb begin
-    axi_pend_txn_o  = (|rd_counter_ff) || (|wr_counter_ff);
+    // 告诉 FSM DMA正在运行
+    axi_pend_txn_o  = axi_txn_pend_ff;
+    next_rd_txn_req   = rd_txn_req_ff;
+    next_wr_txn_req   = wr_txn_req_ff;
+    // 把错误信号输出给FSM，FSM传出去
     axi_dma_err_o   = dma_error_ff;
     next_dma_error  = dma_error_ff;
-    next_err_lock   = err_lock_ff;
-    next_rd_counter = rd_counter_ff;
-    next_wr_counter = wr_counter_ff;
 
+    // 给各个next信号赋初始值
+    next_axi_txn_pend = axi_txn_pend_ff;
+    next_err_lock     = err_lock_ff;
+    next_beat_count   = beat_counter_ff;
+
+    // DMA没有RUN的时候复位err_lock
     if (~dma_active_i) begin
       next_err_lock   = 1'b0;
     end
     else begin
+      // 如果有错误发生，那么需要把错误锁住，以免多个错误导致error_o跳变
       next_err_lock = rd_err_hpn || wr_err_hpn;
     end
 
+    // 记录错误原因
     if (~err_lock_ff) begin
       if (rd_err_hpn) begin
         next_dma_error.valid    = 1'b1;
-        next_dma_error.type_err = DMA_ERR_OPE;
         next_dma_error.src      = DMA_ERR_RD;
-        next_dma_error.addr     = rd_txn_addr;
+        next_dma_error.addr     = rd_txn_req_ff.raddr;
       end
       else if (wr_err_hpn) begin
         next_dma_error.valid    = 1'b1;
-        next_dma_error.type_err = DMA_ERR_OPE;
         next_dma_error.src      = DMA_ERR_WR;
-        next_dma_error.addr     = wr_txn_addr;
+        next_dma_error.addr     = wr_txn_req_ff.waddr;
       end
     end
 
+    // 如果DMA由DONE转为IDLE，清空lock和error信息
     if (clear_dma_i) begin
       next_dma_error = s_dma_error_t'('0);
-      next_wr_lock   = 1'b0;
     end
 
-    rd_txn_hpn  = dma_axi_req_o.arvalid && dma_axi_resp_i.arready;
-    rd_resp_hpn = dma_axi_resp_i.rvalid &&
-                  dma_axi_resp_i.r.rlast  &&
-                  dma_axi_req_o.rready;
-    wr_txn_hpn  = dma_axi_req_o.awvalid && dma_axi_resp_i.awready;
-    wr_resp_hpn = dma_axi_resp_i.bvalid && dma_axi_req_o.bready;
+    // 握手 / 响应
+    rd_txn_hpn  = axi_req_o.arvalid && axi_resp_i.arready;
+    rd_resp_hpn = axi_resp_i.rvalid && axi_resp_i.r.rlast  && axi_req_o.rready;
+    wr_txn_hpn  = axi_req_o.awvalid && axi_resp_i.awready;
+    wr_beat_hpn = axi_req_o.wvalid  && axi_resp_i.wready;
+    wr_resp_hpn = axi_resp_i.bvalid && axi_req_o.bready;
 
-    if (dma_active_i) begin
-      if (rd_txn_hpn || rd_resp_hpn) begin
-        next_rd_counter = rd_counter_ff + (rd_txn_hpn ? 'd1 : 'd0) - (rd_resp_hpn ? 'd1 : 'd0);
-      end
-
-      if (wr_txn_hpn || wr_resp_hpn) begin
-        next_wr_counter = wr_counter_ff + (wr_txn_hpn ? 'd1 : 'd0) - (wr_resp_hpn ? 'd1 : 'd0);
-      end
-    end
-    else begin
-      next_rd_counter = 'd0;
-      next_wr_counter = 'd0;
-    end
-    // Write Data Txn finished
-    wr_data_txn_hpn = dma_axi_req_o.wvalid &&
-                      dma_axi_req_o.w.wlast  &&
-                      dma_axi_resp_i.wready;
-
-    // Every time we have a new req. coming from the wr streamer,
-    // we store in the queue to push through the wr data channel
-    // in the next CC. However, we don't send multiple wr data txn
-    // without handshake in the wr address channel first. Having
-    // both AWVALID + WVALID asserted is intended to break deadlock
-    // depency in the AXI4 (A3.3 Relationships between the channels
-    // page 44 - AXI4 Spec)
-    wr_new_txn  = 1'b0;
-    next_wr_lock = wr_lock_ff;
-    wr_data_req_in = s_wr_req_t'('0);
-    if (dma_axi_wr_req_i.valid) begin
-      next_wr_lock = ~dma_axi_wr_resp_o.ready;
-      wr_new_txn   = ~wr_lock_ff;
-      wr_data_req_in.alen  = dma_axi_wr_req_i.alen;
-      wr_data_req_in.wstrb = dma_axi_wr_req_i.strb;
+    // 一旦read握手成功，将stream传过来的读信息寄存下来，将输出给FSM的pend拉高
+    if(rd_txn_hpn) begin
+      next_rd_txn_req.raddr = dma_axi_rd_req_i.addr;
+      next_rd_txn_req.rstrb = dma_axi_rd_req_i.strb;
+      next_axi_txn_pend = 1'b1;
     end
 
-    if (wr_txn_hpn) begin
-      next_wr_lock = 1'b0;
+    // 一旦write握手成功，将stream传过来的写信息寄存下来
+    if(wr_txn_hpn) begin
+      next_wr_txn_req.wstrb = dma_axi_wr_req_i.strb;
+      next_wr_txn_req.awlen = dma_axi_wr_req_i.alen;
+      next_wr_txn_req.waddr = dma_axi_wr_req_i.addr;
     end
 
-    wr_beat_hpn = dma_axi_req_o.wvalid && dma_axi_resp_i.wready;
-    next_beat_count = beat_counter_ff;
+    // 一旦write response传来，拉低输出给FSM的pend
+    if (wr_resp_hpn) begin
+      next_axi_txn_pend = 1'b0;
+    end
 
-    // Increment each beat of the burst
+    // 写打拍
     if (wr_beat_hpn) begin
       next_beat_count = beat_counter_ff + 'd1;
-    end
-
-    // If the last beat of the burst happens,
-    // lets clear the beat counter
-    if (wr_data_txn_hpn) begin
-      next_beat_count = axi_len_t'('0);
     end
   end
 
   always_comb begin : axi4_master
-    dma_axi_req_o = axi_req_t'('0);
-    dma_fifo_req_o = s_dma_fifo_req_t'('0);
-    rd_err_hpn = 1'b0;
-    wr_err_hpn = 1'b0;
-    dma_axi_rd_resp_o = s_dma_axi_resp_t'('0);
-    dma_axi_wr_resp_o = s_dma_axi_resp_t'('0);
-    next_aw_txn = aw_txn_started_ff;
+    axi_req_o         = axi_req_t'('0);         // 给AXI总线的信号
+    dma_fifo_req_o    = s_dma_fifo_req_t'('0);  // 给数据缓存FIFO的信号 [wr | rd | wr_data]
+    rd_err_hpn        = 1'b0;
+    wr_err_hpn        = 1'b0;
+    dma_axi_rd_resp_o = s_dma_axi_resp_t'('0);  // ready信号是去告诉valid源可以拉低了[已经握手成功]
+    dma_axi_wr_resp_o = s_dma_axi_resp_t'('0);  // ready
+    next_aw_txn       = aw_txn_started_ff;
 
+    // FSM中RUN的时候，dma_active_i就会被拉高
     if (dma_active_i) begin
-      // Address Read Channel - AR*
-      dma_axi_req_o.ar.arprot = 3'b010;
-      dma_axi_req_o.ar.arid   = axi_id_t'(0);
-
-      dma_axi_req_o.arvalid = (rd_counter_ff < `DMA_RD_TXN_BUFF) ? dma_axi_rd_req_i.valid : 1'b0;
-      if (dma_axi_req_o.arvalid) begin
-        dma_axi_rd_resp_o.ready = dma_axi_resp_i.arready;
-        dma_axi_req_o.ar.araddr  = dma_axi_rd_req_i.addr;
-        dma_axi_req_o.ar.arlen   = dma_axi_rd_req_i.alen;
-        dma_axi_req_o.ar.arsize  = dma_axi_rd_req_i.size;
-        dma_axi_req_o.ar.arburst = 2'b01;  // INCR传输
+      /* 读操作 */
+      axi_req_o.ar.arprot = 3'b010;        // Unprivileged | Non-Secure | Data
+      axi_req_o.ar.arid   = axi_id_t'(0);  // DMA保持id始终为零即可
+      // [给slave读地址 arvalid] - Streamder传过来的valid
+      axi_req_o.arvalid = dma_axi_rd_req_i.valid;
+      if (axi_req_o.arvalid) begin
+        dma_axi_rd_resp_o.ready = axi_resp_i.arready;
+        axi_req_o.ar.araddr  = dma_axi_rd_req_i.addr;
+        axi_req_o.ar.arlen   = dma_axi_rd_req_i.alen;
+        axi_req_o.ar.arsize  = dma_axi_rd_req_i.size;
+        axi_req_o.ar.arburst = 2'b01;  // INCR传输
       end
-      // Read Data Channel - R*
-      dma_axi_req_o.rready = (~dma_fifo_resp_i.full);
-      if (dma_axi_resp_i.rvalid && (~dma_fifo_resp_i.full)) begin
+      // [给slave读数据 rready] - 如果FIFO没有满，那就准备好读数据
+      axi_req_o.rready = (~dma_fifo_resp_i.full);
+      // 等待slave的valid...
+      if (axi_resp_i.rvalid && (~dma_fifo_resp_i.full)) begin
         dma_fifo_req_o.wr      = 1'b1;
-        dma_fifo_req_o.data_wr = apply_strb(dma_axi_resp_i.r.rdata, rd_txn_last_strb);
-        if (dma_axi_resp_i.r.rlast && dma_axi_req_o.rready) begin
-          rd_err_hpn = (dma_axi_resp_i.r.rresp == 2'b10) ||
-                       (dma_axi_resp_i.r.rresp == 2'b10);
+        dma_fifo_req_o.data_wr = apply_strb(axi_resp_i.r.rdata, rd_txn_req_ff.rstrb); // 会应用streamer算出来的read strb
+        if (axi_resp_i.r.rlast && axi_req_o.rready) begin
+          // 10 - SLVERR「Slave错误」 | 10 - DECERR「总线解码错误」
+          rd_err_hpn = (axi_resp_i.r.rresp == 2'b10) || (axi_resp_i.r.rresp == 2'b11);
         end
       end
-      // Address Write Channel - AW*
-      dma_axi_req_o.aw.awprot = 3'b010;
-      dma_axi_req_o.aw.awid   = axi_id_t'(0);
-      // Send a write txn based on the following conditions:
-      // 1- if (we have enough buffer space - `DMA_WR_TXN_BUFF)
-      // 2- We have a request coming from the streamer - ...valid
-      // 3- ...and we have something to send in the data phase ...~empty
-      // 3 (OR)- we have an abort request, so we can ignore the DMA_FIFO
-      // 4- Or we have started a txn and we need to respect valid/ready handshake.
-      //    We could potentially put awvalid back to low if dma_fifo gets empty
-      //    while we are waiting for awready from the slave
-      dma_axi_req_o.awvalid = (wr_counter_ff < `DMA_WR_TXN_BUFF) ? ((dma_axi_wr_req_i.valid &&
-                           (~dma_fifo_resp_i.empty)) || aw_txn_started_ff) : 1'b0;
-      if (dma_axi_req_o.awvalid) begin
-        dma_axi_wr_resp_o.ready = dma_axi_resp_i.awready;
-        dma_axi_req_o.aw.awaddr  = dma_axi_wr_req_i.addr;
-        dma_axi_req_o.aw.awlen   = dma_axi_wr_req_i.alen;
-        dma_axi_req_o.aw.awsize  = dma_axi_wr_req_i.size;
-        dma_axi_req_o.aw.awburst = 2'b01;  // INCR传输
-        next_aw_txn        = ~dma_axi_resp_i.awready; // Ensures we respect valid / ready AMBA protocol
+
+      /* 写操作 */
+      axi_req_o.aw.awprot = 3'b010;
+      axi_req_o.aw.awid   = axi_id_t'(0);
+      // [给slave写地址 awvalid] - Streamer传过来的valid 或 写操作已经开始但是awready消失
+      axi_req_o.awvalid = ((dma_axi_wr_req_i.valid && (~dma_fifo_resp_i.empty)) || aw_txn_started_ff);
+      if (axi_req_o.awvalid) begin
+        dma_axi_wr_resp_o.ready  = axi_resp_i.awready;
+        axi_req_o.aw.awaddr      = dma_axi_wr_req_i.addr;
+        axi_req_o.aw.awlen       = dma_axi_wr_req_i.alen;
+        axi_req_o.aw.awsize      = dma_axi_wr_req_i.size;
+        axi_req_o.aw.awburst     = 2'b01;  // INCR传输
+        next_aw_txn              = ~axi_resp_i.awready; // 让valid保持住
       end
-      // Write Data Channel - W*
-      if (~wr_data_req_empty && (~dma_fifo_resp_i.empty)) begin
-        dma_fifo_req_o.rd = dma_axi_resp_i.wready;
-        dma_axi_req_o.w.wdata  = dma_fifo_resp_i.data_rd;
-        dma_axi_req_o.w.wstrb  = wr_data_req_out.wstrb;
-        dma_axi_req_o.w.wlast  = (beat_counter_ff == wr_data_req_out.alen);
-        dma_axi_req_o.wvalid = 1'b1;
+      // [给slave写数据 w] - 如果FIFO没有空，就一直写
+      if(~dma_fifo_resp_i.empty) begin
+        dma_fifo_req_o.rd = axi_resp_i.wready;
+        axi_req_o.w.wdata = dma_fifo_resp_i.data_rd;
+        axi_req_o.w.wstrb = wr_txn_req_ff.wstrb;
+        axi_req_o.w.wlast = (beat_counter_ff == wr_txn_req_ff.awlen);
+        axi_req_o.wvalid  = 1'b1;
       end
-      // Write Response Channel - B*
-      dma_axi_req_o.bready = 1'b1;
-      if (dma_axi_resp_i.bvalid) begin
-        wr_err_hpn  = (dma_axi_resp_i.b.bresp == 2'b10) ||
-                      (dma_axi_resp_i.b.bresp == 2'b11);
+      axi_req_o.bready = 1'b1;
+      if (axi_resp_i.bvalid) begin
+        // 10 - SLVERR「Slave错误」 | 10 - DECERR「总线解码错误」
+        wr_err_hpn  = (axi_resp_i.b.bresp == 2'b10) || (axi_resp_i.b.bresp == 2'b11);
       end
     end
   end : axi4_master
 
   always_ff @ (posedge clk) begin
     if (rst) begin
-      rd_counter_ff     <= pend_rd_t'('0);
-      wr_counter_ff     <= pend_rd_t'('0);
-      dma_error_ff      <= s_dma_error_t'('0);
+      axi_txn_pend_ff   <= 1'b0;
+      rd_txn_req_ff     <= s_rd_req_t'(0);
+      wr_txn_req_ff     <= s_wr_req_t'(0);
       err_lock_ff       <= 1'b0;
+      dma_error_ff      <= s_dma_error_t'('0);
       beat_counter_ff   <= '0;
-      wr_lock_ff        <= 1'b0;
       aw_txn_started_ff <= 1'b0;
     end
     else begin
-      rd_counter_ff     <= next_rd_counter;
-      wr_counter_ff     <= next_wr_counter;
-      dma_error_ff      <= next_dma_error;
+      axi_txn_pend_ff   <= next_axi_txn_pend;
+      rd_txn_req_ff     <= next_rd_txn_req;
+      wr_txn_req_ff     <= next_wr_txn_req;
       err_lock_ff       <= next_err_lock;
+      dma_error_ff      <= next_dma_error;
       beat_counter_ff   <= next_beat_count;
-      wr_lock_ff        <= next_wr_lock;
       aw_txn_started_ff <= next_aw_txn;
     end
   end
