@@ -29,14 +29,16 @@ module dma_fsm
   // _txn_ : transaction
   // _mosi_: master out slave in
   // _desc_: descriptor
+  // _hpn  : happen
 
   // [dma_st_t] DMA status: IDLE ｜ RUN ｜ DONE
   dma_st_t cur_st_ff, next_st;
-  logic rd_desc_done_ff, next_rd_desc_done;
-  logic wr_desc_done_ff, next_wr_desc_done;
+  // done是streamer传过来的，用来指示当前解读control信号已经完成了，使用done_ff来存储streamer传来的done信号状态
+  logic    rd_desc_done_ff, next_rd_desc_done;
+  logic    wr_desc_done_ff, next_wr_desc_done;
 
-  logic pending_desc;  // 当有待处理的descriptor时该标识符会被置位
-  logic pending_rd_desc, pending_wr_desc;
+  logic    pending_desc;  // 当有待处理的descriptor时该标识符会被置位
+  logic    pending_rd_desc, pending_wr_desc;
 
   // DMA的状态机逻辑
   always_comb begin : fsm_dma_ctrl
@@ -50,6 +52,7 @@ module dma_fsm
         end
       end
       DMA_ST_RUN: begin
+        // 要么是streamer在工作，要么是axi interface在工作[读地址握手-写事物有效]
         if (pending_desc || axi_pend_txn_i) begin
           next_st = DMA_ST_RUN;
         end
@@ -73,7 +76,7 @@ module dma_fsm
     dma_active_o          = (cur_st_ff == DMA_ST_RUN);
 
     if (cur_st_ff == DMA_ST_RUN) begin
-      // 如果传输的bytes不为0  和 `rd_desc_done_ff` = 0
+      // 如果传输的bytes不为 0 和 `rd_desc_done_ff` = 0
       if((|dma_desc_i.num_bytes) && (~rd_desc_done_ff)) begin
         dma_stream_rd_valid_o = 1'b1; // 告诉streamer Read操作valid
       end
@@ -121,7 +124,6 @@ module dma_fsm
 
     if (axi_txn_err_i.valid) begin
       dma_error_o.addr     = axi_txn_err_i.addr;
-      // dma_error_o.type_err = DMA_ERR_OPE;
       dma_error_o.src      = axi_txn_err_i.src;
       dma_error_o.valid    = 1'b1;
     end

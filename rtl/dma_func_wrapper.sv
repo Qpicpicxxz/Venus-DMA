@@ -37,6 +37,8 @@ module dma_func_wrapper
   s_dma_fifo_resp_t dma_fifo_resp;
 
   s_dma_error_t     axi_dma_err;
+  s_dma_error_t     dma_stream_rd_err;
+  s_dma_error_t     dma_stream_wr_err;
 
   logic             axi_pend_txn;
   logic             clear_dma;   // DMA从 DONE 下一拍即将转为 IDLE 的时候拉高此信号 -> 用于清空所有的fifo
@@ -103,9 +105,7 @@ module dma_func_wrapper
     .data_i           (dma_fifo_req.data_wr),
     .data_o           (dma_fifo_resp.data_rd),
     .full_o           (dma_fifo_resp.full),
-    .empty_o          (dma_fifo_resp.empty),
-    .ocup_o           (dma_fifo_resp.ocup),
-    .free_o           (dma_fifo_resp.space)
+    .empty_o          (dma_fifo_resp.empty)
   );
 
   dma_axi_if u_dma_axi_if (

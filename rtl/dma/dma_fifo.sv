@@ -12,10 +12,8 @@ module dma_fifo
   input                           read_i,
   input         [WIDTH-1:0]       data_i,
   output  logic [WIDTH-1:0]       data_o,
-  output  logic                   full_o,  // 是否满了
-  output  logic                   empty_o, // 是否空了
-  output  logic [$clog2(SLOTS>1?SLOTS:2):0]     ocup_o,  // 占用了多少 ｜ SLOTS = 0/1/2 时，[1:0] ocup | SLOT = 8 时， [3:0] ocup
-  output  logic [$clog2(SLOTS>1?SLOTS:2):0]     free_o   // 还剩下空闲的多少
+  output  logic                   full_o, // 是否满了
+  output  logic                   empty_o // 是否空了
 );
   // `MSB`: Most Significant Bit 最高有效位
   `define MSB_SLOT  $clog2(SLOTS>1?SLOTS:2)
@@ -28,7 +26,6 @@ module dma_fifo
   msb_t                         read_ptr_ff;       // 写指针寄存器
   msb_t                         next_write_ptr;
   msb_t                         next_read_ptr;
-  msb_t                         fifo_ocup;         // fifo占用中间计算信号
 
   always_comb begin
     next_read_ptr = read_ptr_ff;
@@ -53,10 +50,6 @@ module dma_fifo
     if (read_i && ~empty_o)
       next_read_ptr = read_ptr_ff + 'd1;
 
-    // 更新输出信号
-    fifo_ocup = write_ptr_ff - read_ptr_ff;
-    free_o = msb_t'(SLOTS) - fifo_ocup;
-    ocup_o = fifo_ocup;
   end
 
   always_ff @ (posedge clk) begin

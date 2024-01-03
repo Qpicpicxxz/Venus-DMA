@@ -17,6 +17,42 @@ logic [32767:0] response32768;
 logic [65535:0] response65536;
 logic [131071:0] response131072;
 
+parameter TESTDATA512bits_1  =     {256'h2a88_020e_2e81_3a46_ae02_a3db_78cc_9a95_cffd_3df6_d202_7833_a37f_e1dd_3ead_1274,
+                                    256'h39e0_6c1b_ce55_cc13_3143_c0c9_9144_cb22_4045_32d0_a9f8_77e5_7759_0929_a681_0742};
+
+parameter TESTDATA8192bits_1 =     {256'h6941_868c_b0b7_ca07_455f_9a05_8972_2226_c029_c922_e4f6_e0fb_98cd_e670_6020_a376,
+                                    256'ha1d0_cae3_abf2_7dfc_5dff_ef2e_45e2_425d_1130_0df3_540c_3da8_fdff_ad82_a15f_f84a,
+                                    256'he2fe_598d_d536_1ff3_7aa8_5224_4b85_085f_f55a_b112_7bfb_27cd_96db_945c_f527_9c24,
+                                    256'h323b_df29_9e87_f090_b494_30d3_0075_3bb9_de2f_cb2f_9f51_4c40_3d8e_760a_14a9_0e2f,
+                                    256'h9b1a_8014_2f10_b53f_e168_b4e0_c551_ad23_4fb6_9b76_c135_abd6_52ed_9f5d_9840_ec57,
+                                    256'h2a88_020e_2e81_3a46_ae02_a3db_78cc_9a95_cffd_3df6_d202_7833_a37f_e1dd_3ead_1274,
+                                    256'h39e0_6c1b_ce55_cc13_3143_c0c9_9144_cb22_4045_32d0_a9f8_77e5_7759_0929_a681_0742,
+                                    256'hf36f_465b_dce2_fe42_71d1_d6cc_167f_4f8d_3194_6ba8_5f55_d4db_85df_098d_e2a3_b7de,
+                                    256'hc637_3b38_8c76_d9d4_e8f2_849a_3f3e_3af5_76fd_78dc_00cc_cd9f_536f_b298_2151_da92,
+                                    256'h57a4_c868_0860_7156_5779_49d0_dddd_389e_b54c_2ead_4c80_79eb_eac2_a41c_a541_914a,
+                                    256'ha539_3b4a_f747_c59e_8d63_6508_afdf_d5b6_8d4d_26f7_ba53_b353_0656_be9c_0c65_14e0,
+                                    256'ha882_13da_ee49_203c_c0f7_1418_d2a1_af5a_c965_7720_79fc_f6e3_bb76_1442_1eec_c553,
+                                    256'hd2bb_c275_736d_cc8d_b073_034b_ee05_d76f_2877_e32f_4f91_fa49_2912_9c40_ccf6_4cdb,
+                                    256'h65e6_024e_d784_21bd_e2a9_5d2d_59e3_4cf2_bb47_80c5_fe13_6dc9_95b7_f0b9_9cee_186d,
+                                    256'hfc17_3bb4_a5d8_0704_a00e_f86c_ef27_8d67_a4b5_373c_a79e_9e5b_fba8_c155_b355_33ce,
+                                    256'hade9_f910_889e_8a61_4abd_bf0e_8ec8_920d_172c_d7dc_d7f4_dd6e_4096_0570_0545_b373,
+                                    256'h88d0_29f4_13e3_a462_df7d_8647_bb57_4a8b_ec9e_3f36_b874_4002_8ffc_f7c0_fa70_9ccd,
+                                    256'h97dd_6023_a2c0_6450_b9ab_d22c_a43b_7e10_7e5a_940f_714c_29c5_93c2_9ca1_809a_8bc5,
+                                    256'hc92f_abab_2985_542e_ec54_1b07_d872_aea6_030b_068f_c82b_1022_5d2e_560f_17d4_d93b,
+                                    256'hdc68_333a_5051_7312_a5c8_a425_2630_2517_193d_7056_a1fb_a464_71af_e388_7523_ab80,
+                                    256'h98da_fd9a_634b_821a_17c0_d162_e62a_443b_052a_830c_39c8_fd4b_75d7_72ec_b8bc_ff5c,
+                                    256'h1b16_d057_bf12_b913_aec6_d23e_c434_f200_5843_acbb_ede4_4da2_5d35_09cd_da86_5c0a,
+                                    256'hc8b0_ab8d_e20e_4680_fdf2_fcb2_4d6a_37e0_39ab_fefe_8c85_f1df_333b_d126_5988_89a0,
+                                    256'hbc74_f2bb_4f7c_8da2_ae91_6584_bf05_2844_8666_3fc7_6135_8bd5_d083_99c0_f971_6077,
+                                    256'h3e79_1f27_1e32_4be4_8bc4_c229_800f_0b59_799f_08ce_e906_3bbe_d949_7607_a4e7_3f12,
+                                    256'hf742_b1b1_c022_25d2_452e_cde2_fde9_6f6a_cc4e_d5db_6e6b_3512_0307_2cd1_579c_e7d1,
+                                    256'ha2fb_ca1e_5d97_1060_2038_c4fd_57ba_72de_c95c_188f_18f8_55d1_3f4a_c565_b50a_ae2c,
+                                    256'h6cd3_ff98_991d_e391_c247_8f4e_3605_6c74_0c49_c4a2_31b9_621d_a36e_423e_b666_d381,
+                                    256'hd402_fc57_0ae8_4c75_11e3_d0dc_f099_62b1_d7d5_f42f_8fec_f672_d88c_cf94_225a_29de,
+                                    256'h42ac_267c_c57b_d959_98a6_6c9b_d158_8c9c_f8bb_7eb9_34b4_4522_fd71_48c5_7b49_8a63,
+                                    256'h2af7_cf7d_fec4_fca9_2ce4_5ebf_9046_5f83_10dd_52f8_6d5a_2007_cb3d_2d40_dfae_481e,
+                                    256'h5283_579e_872b_aa47_b2b7_aafa_e402_9d84_0972_cae1_3aae_934d_e623_81fd_daee_63e1};
+
 parameter TESTDATA16384bits_1 =    {256'hc27f_e629_2e95_ee0b_e685_cefb_b1e8_3e01_59a3_e33c_0124_03d8_d0ec_c30a_e9e0_9483,
                                     256'h6941_868c_b0b7_ca07_455f_9a05_8972_2226_c029_c922_e4f6_e0fb_98cd_e670_6020_a376,
                                     256'ha1d0_cae3_abf2_7dfc_5dff_ef2e_45e2_425d_1130_0df3_540c_3da8_fdff_ad82_a15f_f84a,

@@ -1,12 +1,12 @@
 module dma_tb ();
 `include  "test_data_generator.svh"
-parameter RAM_START_ADDR = 32'h1000_0000;
-parameter RAM_END_ADDR   = 32'h1fff_ffff;
-parameter RAM_SIZE       = 32'h1000_0000;
-parameter TRANSFER_SRC_1   = 32'h1100_0000;
-parameter TRANSFER_DST_1   = 32'h1200_0000;
-parameter TRANSFER_SRC_2   = 32'h1300_0000;
-parameter TRANSFER_DST_2   = 32'h1400_0000;
+parameter RAM_START_ADDR   = 32'h1000_0000;
+parameter RAM_END_ADDR     = 32'h1fff_ffff;
+parameter RAM_SIZE         = 32'h1000_0000;
+parameter NARROW_SRC       = 32'h1100_011b;
+parameter NARROW_DST       = 32'h1400_0127;
+parameter TRANSFER_SRC     = 32'h1100_0100;
+parameter TRANSFER_DST     = 32'h1400_0100;
 
 import axi_pkg::*;
 import dma_pkg::*;
@@ -103,19 +103,17 @@ initial begin
   repeat(10) @(posedge clk);
   $display("[%0t]: Memory initializing...", $time);
   master_ctrl = 1'b0;
-  // 2048bytes = 16384bits
-  u_axi4_master_bfm.BFM_WRITE_BURST2048(TRANSFER_SRC_1,32'h0000_0000,TESTDATA16384bits_1,`ENABLE_MESSAGE);
-  u_axi4_master_bfm.BFM_WRITE_BURST2048(TRANSFER_SRC_2,32'h0000_0000,TESTDATA16384bits_2,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_WRITE_BURST64(TRANSFER_SRC,32'h0000_0000,TESTDATA512bits_1,`ENABLE_MESSAGE);
   $display("[%0t]: Memory initialization done.", $time);
 
   repeat(50) @(posedge clk);
   $display("[%0t]: Change memory control source to DMA...", $time);
   master_ctrl           = 1'b1;
-  dma_desc.src_addr  = TRANSFER_SRC_1;
-  dma_desc.dst_addr  = TRANSFER_DST_1;
-  dma_desc.num_bytes = 32'h800; // 2048byte
+  dma_desc.src_addr     = NARROW_SRC;
+  dma_desc.dst_addr     = NARROW_DST;
+  dma_desc.num_bytes    = 32'hb; // 11byte
 
-  $display("[%0t]: Enable DMA to transfer data 1...", $time);
+  $display("[%0t]: Enable DMA to transfer data...", $time);
   dma_go_i       = 1'b1;
   repeat(1) @(posedge clk);
   dma_go_i       = 1'b0;
@@ -124,33 +122,14 @@ initial begin
   repeat(50) begin
   @(posedge clk);
   if (dma_stats.done == 1'b1) begin
-      $display("[%0t]: DMA transfer completed 1...", $time);
-      break;
-    end
-  end
-
-  dma_desc.src_addr  = TRANSFER_SRC_2;
-  dma_desc.dst_addr  = TRANSFER_DST_2;
-  dma_desc.num_bytes = 32'h800; // 2048byte
-
-  $display("[%0t]: Enable DMA to transfer data 2...", $time);
-  dma_go_i       = 1'b1;
-  repeat(1) @(posedge clk);
-  dma_go_i       = 1'b0;
-  repeat(10) @(posedge clk);
-
-  repeat(50) begin
-  @(posedge clk);
-  if (dma_stats.done == 1'b1) begin
-      $display("[%0t]: DMA transfer completed 2...", $time);
+      $display("[%0t]: DMA transfer completed...", $time);
       break;
     end
   end
 
   $display("[%0t]: Change memory control source to BFM...", $time);
   master_ctrl = 1'b0;
-  u_axi4_master_bfm.BFM_READ_BURST2048(TRANSFER_DST_1,32'h0000_0000,response16384,`ENABLE_MESSAGE);
-  u_axi4_master_bfm.BFM_READ_BURST2048(TRANSFER_DST_2,32'h0000_0000,response16384,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_READ_BURST64(TRANSFER_DST,32'h0000_0000,response512,`ENABLE_MESSAGE);
   repeat(50) @(posedge clk);
   $finish;
 end

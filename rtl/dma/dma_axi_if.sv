@@ -67,9 +67,9 @@ module dma_axi_if
 
 
   // 掩码[63:0] apply to 数据[511:0] ｜ mask[0] = 1 -> data[7:0] is valid
-  function automatic axi_data_t apply_strb(axi_data_t data, axi_strb_t mask);
+  function automatic axi_data_t apply_rd_strb(axi_data_t data, axi_strb_t mask);
     axi_data_t out_data;
-    // 遍历mask的每一位
+    // 将掩码应用到从slave read的data上
     for (int i=0; i<$bits(axi_strb_t); i++) begin
       if (mask[i] == 1'b1) begin
         out_data[(8*i)+:8] = data[(8*i)+:8];
@@ -78,8 +78,43 @@ module dma_axi_if
         out_data[(8*i)+:8] = 8'd0;
       end
     end
+    // 获取data的真实大小
+    for (int i=0; i<$bits(axi_strb_t); i++) begin
+      if (mask[i] == 1'b1) begin
+        out_data = out_data >> (i*8);
+        break;
+      end
+    end
     return out_data;
   endfunction
+
+  function automatic axi_data_t apply_wr_strb(axi_data_t data, axi_strb_t mask);
+    axi_data_t out_data;
+    // 调整narrow transfer的data位置
+    for (int i=0; i<$bits(axi_strb_t); i++) begin
+      if (mask[i] == 1'b1) begin
+        out_data = data << (i*8);
+        break;
+      end
+    end
+    return out_data;
+  endfunction
+
+  // function automatic axi_data_t apply_strb(axi_data_t data, axi_strb_t rd_strb, axi_strb_t wr_strb);
+  //   axi_data_t out_data;
+  //   for (int i=0; i<$bits(axi_strb_t); i++) begin
+  //     if (rd_strb[i] == 1'b1) begin
+  //       out_data = data >> (i*8);
+  //       break;
+  //     end
+  //   end
+  //   for (int i=0; i<$bits(axi_strb_t); i++) begin
+  //     if (wr_strb[i] == 1'b1) begin
+  //       out_data = data << (i*8);
+  //       break;
+  //     end
+  //   end
+  // endfunction
 
   always_comb begin
     // 告诉 FSM DMA正在运行
@@ -108,12 +143,12 @@ module dma_axi_if
     if (~err_lock_ff) begin
       if (rd_err_hpn) begin
         next_dma_error.valid    = 1'b1;
-        next_dma_error.src      = DMA_ERR_RD;
+        next_dma_error.src      = DMA_AXI_RD_ERR;
         next_dma_error.addr     = rd_txn_req_ff.raddr;
       end
       else if (wr_err_hpn) begin
         next_dma_error.valid    = 1'b1;
-        next_dma_error.src      = DMA_ERR_WR;
+        next_dma_error.src      = DMA_AXI_WR_ERR;
         next_dma_error.addr     = wr_txn_req_ff.waddr;
       end
     end
@@ -166,7 +201,8 @@ module dma_axi_if
 
     // FSM中RUN的时候，dma_active_i就会被拉高
     if (dma_active_i) begin
-      /* 读操作 */
+
+      /* 读slave操作 */
       axi_req_o.ar.arprot = 3'b010;        // Unprivileged | Non-Secure | Data
       axi_req_o.ar.arid   = axi_id_t'(0);  // DMA保持id始终为零即可
       // [给slave读地址 arvalid] - Streamder传过来的valid
@@ -183,14 +219,14 @@ module dma_axi_if
       // 等待slave的valid...
       if (axi_resp_i.rvalid && (~dma_fifo_resp_i.full)) begin
         dma_fifo_req_o.wr      = 1'b1;
-        dma_fifo_req_o.data_wr = apply_strb(axi_resp_i.r.rdata, rd_txn_req_ff.rstrb); // 会应用streamer算出来的read strb
+        dma_fifo_req_o.data_wr = apply_rd_strb(axi_resp_i.r.rdata, rd_txn_req_ff.rstrb);
         if (axi_resp_i.r.rlast && axi_req_o.rready) begin
           // 10 - SLVERR「Slave错误」 | 10 - DECERR「总线解码错误」
           rd_err_hpn = (axi_resp_i.r.rresp == 2'b10) || (axi_resp_i.r.rresp == 2'b11);
         end
       end
 
-      /* 写操作 */
+      /* 写slave操作 */
       axi_req_o.aw.awprot = 3'b010;
       axi_req_o.aw.awid   = axi_id_t'(0);
       // [给slave写地址 awvalid] - Streamer传过来的valid 或 写操作已经开始但是awready消失
@@ -203,10 +239,10 @@ module dma_axi_if
         axi_req_o.aw.awburst     = 2'b01;  // INCR传输
         next_aw_txn              = ~axi_resp_i.awready; // 让valid保持住
       end
-      // [给slave写数据 w] - 如果FIFO没有空，就一直写
+      // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
       if(~dma_fifo_resp_i.empty) begin
         dma_fifo_req_o.rd = axi_resp_i.wready;
-        axi_req_o.w.wdata = dma_fifo_resp_i.data_rd;
+        axi_req_o.w.wdata = apply_wr_strb(dma_fifo_resp_i.data_rd, wr_txn_req_ff.wstrb);
         axi_req_o.w.wstrb = wr_txn_req_ff.wstrb;
         axi_req_o.w.wlast = (beat_counter_ff == wr_txn_req_ff.awlen);
         axi_req_o.wvalid  = 1'b1;
