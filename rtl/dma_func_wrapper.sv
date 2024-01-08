@@ -3,7 +3,7 @@ module dma_func_wrapper
   import axi_pkg::*;
 (
   input                                     clk,
-  input                                     rst,
+  input                                     rstn,
   // From/To CSRs
   input   logic                             dma_go_i,
   // `s_dma_dest_t`是DMA某一路的配置信息 src | dst | bytes
@@ -46,7 +46,7 @@ module dma_func_wrapper
 
   dma_fsm u_dma_fsm(
     .clk                    (clk),
-    .rst                    (rst),
+    .rstn                   (rstn),
 
     // 启动控制 ｜ 事物描述 | 总体状态[error/done]
     .dma_go_i               (dma_go_i),
@@ -73,7 +73,7 @@ module dma_func_wrapper
     .STREAM_TYPE(0)
   ) u_dma_rd_streamer (
     .clk                    (clk),
-    .rst                    (rst),
+    .rstn                   (rstn),
     .dma_desc_i             (dma_desc_i),
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_rd_req),
@@ -89,7 +89,7 @@ module dma_func_wrapper
     .STREAM_TYPE(1)
   ) u_dma_wr_streamer (
     .clk                    (clk),
-    .rst                    (rst),
+    .rstn                   (rstn),
     .dma_desc_i             (dma_desc_i),
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_wr_req),
@@ -102,7 +102,7 @@ module dma_func_wrapper
 
   dma_fifo u_dma_fifo(
     .clk              (clk),
-    .rst              (rst),
+    .rstn              (rstn),
     .clear_i          (clear_dma),
     .write_i          (dma_fifo_req.wr),
     .read_i           (dma_fifo_req.rd),
@@ -114,7 +114,7 @@ module dma_func_wrapper
 
   dma_axi_if u_dma_axi_if (
     .clk                  (clk),
-    .rst                  (rst),
+    .rstn                 (rstn),
     // From/To Streamers
     .dma_axi_rd_req_i     (dma_axi_rd_req),
     .dma_axi_rd_resp_o    (dma_axi_rd_resp),

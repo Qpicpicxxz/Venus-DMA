@@ -6,7 +6,7 @@ module dma_streamer
   parameter bit STREAM_TYPE = 0 // 0 - Read, 1 - Write
 ) (
   input                                     clk,
-  input                                     rst,
+  input                                     rstn,
   // From/To CSRs
   input   s_dma_desc_t                      dma_desc_i,
   // From/To AXI I/F
@@ -267,7 +267,7 @@ module dma_streamer
   end : burst_calc
 
   always_ff @ (posedge clk) begin
-    if (rst) begin
+    if (~rstn) begin
       cur_st_ff     <= dma_sm_t'('0);
       desc_addr_ff  <= axi_addr_t'('0);
       desc_bytes_ff <= desc_num_t'('0);

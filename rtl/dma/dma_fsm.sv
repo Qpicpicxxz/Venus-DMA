@@ -3,7 +3,7 @@ module dma_fsm
   import dma_pkg::*;
 (
   input                                     clk,
-  input                                     rst,
+  input                                     rstn,
 
   // 启动控制 ｜ 事物描述 | 总体状态[error/done]
   input   logic                             dma_go_i,
@@ -161,7 +161,7 @@ module dma_fsm
   end : dma_err_handler
 
   always_ff @ (posedge clk) begin
-    if (rst) begin
+    if (~rstn) begin
       cur_st_ff       <= dma_st_t'('0);
       rd_desc_done_ff <= '0;
       wr_desc_done_ff <= '0;

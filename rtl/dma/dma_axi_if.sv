@@ -4,7 +4,7 @@ module dma_axi_if
   import dma_pkg::*;
 (
   input                     clk,
-  input                     rst,
+  input                     rstn,
 
   // From/To Streamers
   // `s_dma_axi_req_t` : addr | alen | size | strb | valid
@@ -263,7 +263,7 @@ module dma_axi_if
   end : axi4_master
 
   always_ff @ (posedge clk) begin
-    if (rst) begin
+    if (~rstn) begin
       axi_txn_pend_ff   <= 1'b0;
       rd_txn_req_ff     <= s_rd_req_t'(0);
       wr_txn_req_ff     <= s_wr_req_t'(0);

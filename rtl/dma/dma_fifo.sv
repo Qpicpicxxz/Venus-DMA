@@ -6,7 +6,7 @@ module dma_fifo
   parameter int WIDTH = `DMA_DATA_WIDTH   // fifo中存储的东西位宽
 )(
   input                           clk,
-  input                           rst,
+  input                           rstn,
   input                           clear_i,
   input                           write_i, // 写入或读取fifo
   input                           read_i,
@@ -53,7 +53,7 @@ module dma_fifo
   end
 
   always_ff @ (posedge clk) begin
-    if (rst) begin
+    if (~rstn) begin
       write_ptr_ff <= '0;
       read_ptr_ff  <= '0;
     end
