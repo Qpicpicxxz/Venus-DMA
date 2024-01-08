@@ -14,7 +14,8 @@ module dma_streamer
   input   s_dma_axi_resp_t                  dma_axi_resp_i,
   // To/From DMA FSM
   input   logic                             dma_stream_valid_i,
-  output  logic                             dma_stream_done_o
+  output  logic                             dma_stream_done_o,
+  output  s_dma_error_t                     dma_stream_err_o
 );
   // bytes_p_burst = 512bit / 8 = 64byte 一次突发传输64byte的数据
   localparam        bytes_p_burst = (`DMA_DATA_WIDTH/8);
@@ -25,8 +26,8 @@ module dma_streamer
   typedef           logic [max_txn_width:0] max_bytes_t;
   max_bytes_t       txn_bytes;
 
-  dma_sm_t          cur_st_ff,      next_st;  // DMA_ST_SM_IDLE ｜ DMA_ST_SM_RUN
-  axi_addr_t        desc_addr_ff,   next_desc_addr;  // [511:0]
+  dma_sm_t          cur_st_ff,      next_st;          // DMA_ST_SM_IDLE ｜ DMA_ST_SM_RUN
+  axi_addr_t        desc_addr_ff,   next_desc_addr;   // [511:0]
   desc_num_t        desc_bytes_ff,  next_desc_bytes;  // [31:0]
 
   s_dma_axi_req_t   dma_req_ff, next_dma_req;  // Stream - AXI IF | addr | alen | size | strb | valid
@@ -34,6 +35,9 @@ module dma_streamer
   logic             last_txn_ff, next_last_txn;
   logic             last_txn_proc;
 
+  logic             addr_unaligned_err, addr_cross_bound_err;
+  logic             err_lock_ff, next_err_lock;
+  s_dma_error_t     dma_error_ff, next_dma_error;
 
   // 检查源地址与目的地址是否4kB越界 ｜ [0 - 越界] [1 - 未越界]
   function automatic logic burst_r4KB(axi_addr_t base, axi_addr_t fut);
@@ -110,7 +114,49 @@ module dma_streamer
     return aligned_addr;
   endfunction
 
-  always_comb begin : streamer_dma_ctrl
+  function automatic logic is_addr_aligned(axi_addr_t addr);
+      return (addr[5:0] == '0);
+  endfunction
+
+  function automatic logic enough_for_burst(desc_num_t bytes);
+      return (bytes >= 'd64);
+  endfunction
+
+  function automatic axi_strb_t get_strb(axi_addr_t base, desc_num_t bytes);
+    axi_strb_t strobe;
+    strobe = (1 << bytes) - 1;
+    return (strobe << (base % 64));
+  endfunction
+
+  always_comb begin: err_handler
+    next_err_lock        = err_lock_ff;
+    next_dma_error       = dma_error_ff;
+    // 把错误信号输出给FSM，FSM传出去
+    dma_stream_err_o     = dma_error_ff;
+
+    // Streamer没有valid的时候不处理error
+    if (~dma_stream_valid_i) begin
+      next_err_lock = 1'b0;
+    end
+    else begin
+      next_err_lock = addr_unaligned_err || addr_cross_bound_err;
+    end
+
+    if (~err_lock_ff) begin
+      if (addr_unaligned_err) begin
+        next_dma_error.valid    = 1'b1;
+        next_dma_error.src      = DMA_UNALIGNED_ERR;
+        next_dma_error.addr     = desc_addr_ff;
+      end
+      else if (addr_cross_bound_err) begin
+        next_dma_error.valid    = 1'b1;
+        next_dma_error.src      = DMA_NARROW_CROSS_ERR;
+        next_dma_error.addr     = desc_addr_ff;
+      end
+    end
+  end: err_handler
+
+  always_comb begin : streamer_status
     next_st = DMA_ST_SM_IDLE;
     case (cur_st_ff)
       DMA_ST_SM_IDLE: begin
@@ -128,24 +174,13 @@ module dma_streamer
         end
       end
     endcase
-  end : streamer_dma_ctrl
-
-  function automatic logic is_addr_aligned(axi_addr_t addr);
-      return (addr[5:0] == '0);
-  endfunction
-
-  function automatic logic enough_for_burst(desc_num_t bytes);
-      return (bytes >= 'd64);
-  endfunction
-
-  function automatic axi_strb_t get_strb(axi_addr_t base, desc_num_t bytes);
-    axi_strb_t strobe;
-    strobe = (1 << bytes) - 1;
-    return (strobe << (base % 64));
-  endfunction
+  end : streamer_status
 
   // Streamer负责计算突发次数等
   always_comb begin : burst_calc
+    // 负责捕捉错误信号
+    addr_unaligned_err   = 1'b0;
+    addr_cross_bound_err = 1'b0;
     dma_stream_done_o    = 1'b0;
     next_dma_req         = dma_req_ff;
     next_desc_addr       = desc_addr_ff;
@@ -153,9 +188,6 @@ module dma_streamer
     dma_axi_req_o        = dma_req_ff;
     next_last_txn        = last_txn_ff;
     last_txn_proc        = 1'b0;
-
-
-
 
     // FSM valid进来的那一拍 / dma_go_i的下一拍
     if ((cur_st_ff == DMA_ST_SM_IDLE) && (next_st == DMA_ST_SM_RUN)) begin
@@ -197,13 +229,13 @@ module dma_streamer
         end
         // 2. 异常情况：地址未对齐 + 传输长度 >= 64bytes
         else if(enough_for_burst(desc_bytes_ff)) begin
-          // TODO: 报错，需要给streamer添加一个与fsm连接的err线
+          addr_unaligned_err = 1'b1;
         end
         // 3. narrow transfer情况：传输长度 <= 64bytes
         else begin
           // 3.1. 判断是否会跨越64byte边界 | 0 - 越界 ｜ 1 - 未越界
           if(~cross_64byte_bound(desc_addr_ff, desc_addr_ff+desc_bytes_ff)) begin
-            // TODO: 报错
+            addr_cross_bound_err = 1'b1;
           end
           else begin
             next_dma_req.addr = floor_align64_addr(desc_addr_ff);
@@ -240,7 +272,9 @@ module dma_streamer
       desc_addr_ff  <= axi_addr_t'('0);
       desc_bytes_ff <= desc_num_t'('0);
       last_txn_ff   <= 1'b0;
-      dma_req_ff    <= '0;
+      dma_req_ff    <= s_dma_axi_req_t'(0);
+      err_lock_ff   <= 1'b0;
+      dma_error_ff  <= s_dma_error_t'('0);
     end
     else begin
       cur_st_ff     <= next_st;
@@ -248,6 +282,8 @@ module dma_streamer
       desc_bytes_ff <= next_desc_bytes;
       last_txn_ff   <= next_last_txn;
       dma_req_ff    <= next_dma_req;
+      err_lock_ff   <= next_err_lock;
+      dma_error_ff  <= next_dma_error;
     end
   end
 endmodule

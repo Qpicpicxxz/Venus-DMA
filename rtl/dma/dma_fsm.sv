@@ -20,8 +20,10 @@ module dma_fsm
   // To/From streamers
   output  logic                             dma_stream_rd_valid_o,
   input   logic                             dma_stream_rd_done_i,
+  input   s_dma_error_t                     dma_stream_rd_err_i,
   output  logic                             dma_stream_wr_valid_o,
-  input   logic                             dma_stream_wr_done_i
+  input   logic                             dma_stream_wr_done_i,
+  input   s_dma_error_t                     dma_stream_wr_err_i
 );
   // _ff   : flip-flop 触发器「寄存器」
   // _rd_  : read
@@ -34,14 +36,18 @@ module dma_fsm
   // [dma_st_t] DMA status: IDLE ｜ RUN ｜ DONE
   dma_st_t cur_st_ff, next_st;
   // done是streamer传过来的，用来指示当前解读control信号已经完成了，使用done_ff来存储streamer传来的done信号状态
-  logic    rd_desc_done_ff, next_rd_desc_done;
-  logic    wr_desc_done_ff, next_wr_desc_done;
+  logic             rd_desc_done_ff, next_rd_desc_done;
+  logic             wr_desc_done_ff, next_wr_desc_done;
 
-  logic    pending_desc;  // 当有待处理的descriptor时该标识符会被置位
-  logic    pending_rd_desc, pending_wr_desc;
+  logic             pending_desc;  // 当有待处理的descriptor时该标识符会被置位
+  logic             pending_rd_desc, pending_wr_desc;
+
+  logic             dma_err_hpn;
+  logic             err_lock_ff, next_err_lock;
+  s_dma_error_t     dma_error_ff, next_dma_error;
 
   // DMA的状态机逻辑
-  always_comb begin : fsm_dma_ctrl
+  always_comb begin : dma_fsm
     next_st = DMA_ST_IDLE;
     pending_desc = pending_rd_desc || pending_wr_desc;
 
@@ -66,7 +72,10 @@ module dma_fsm
         end
       end
     endcase
-  end : fsm_dma_ctrl
+
+    dma_stats_o.done  = (cur_st_ff == DMA_ST_DONE);
+    clear_dma_o       = (cur_st_ff == DMA_ST_DONE) && (next_st == DMA_ST_IDLE);
+  end : dma_fsm
 
   // Read streamer
   always_comb begin : rd_streamer
@@ -119,29 +128,51 @@ module dma_fsm
   end : wr_streamer
 
   // DMA 状态的更新和错误信息的处理 addr | src[RD/WR] | valid
-  always_comb begin : dma_status
-    dma_error_o = s_dma_error_t'('0);
+  always_comb begin : dma_err_handler
+    next_err_lock   = err_lock_ff;
+    next_dma_error  = dma_error_ff;
+    dma_error_o     = dma_error_ff;
+    dma_err_hpn     = axi_txn_err_i.valid || dma_stream_rd_err_i.valid || dma_stream_wr_err_i.valid;
 
-    if (axi_txn_err_i.valid) begin
-      dma_error_o.addr     = axi_txn_err_i.addr;
-      dma_error_o.src      = axi_txn_err_i.src;
-      dma_error_o.valid    = 1'b1;
+    if (cur_st_ff != DMA_ST_RUN) begin
+      next_err_lock = 1'b0;
+    end else begin
+      next_err_lock = dma_err_hpn;
     end
-    dma_stats_o.error = axi_txn_err_i.valid;
-    dma_stats_o.done  = (cur_st_ff == DMA_ST_DONE);
-    clear_dma_o       = (cur_st_ff == DMA_ST_DONE) && (next_st == DMA_ST_IDLE);
-  end : dma_status
+
+    if (~err_lock_ff) begin
+      if (axi_txn_err_i.valid) begin
+        next_dma_error.valid = 1'b1;
+        next_dma_error.src   = axi_txn_err_i.src;
+        next_dma_error.addr  = axi_txn_err_i.addr;
+      end
+      else if (dma_stream_rd_err_i.valid) begin
+        next_dma_error.valid = 1'b1;
+        next_dma_error.src   = dma_stream_rd_err_i.src;
+        next_dma_error.addr  = dma_stream_rd_err_i.addr;
+      end
+      else if (dma_stream_wr_err_i) begin
+        next_dma_error.valid = 1'b1;
+        next_dma_error.src   = dma_stream_wr_err_i.src;
+        next_dma_error.addr  = dma_stream_wr_err_i.addr;
+      end
+    end
+    dma_stats_o.error = dma_err_hpn;
+  end : dma_err_handler
 
   always_ff @ (posedge clk) begin
     if (rst) begin
       cur_st_ff       <= dma_st_t'('0);
       rd_desc_done_ff <= '0;
       wr_desc_done_ff <= '0;
+      err_lock_ff     <= 1'b0;
+      dma_error_ff    <= s_dma_error_t'('0);
     end
     else begin
       cur_st_ff       <= next_st;
       rd_desc_done_ff <= next_rd_desc_done;
       wr_desc_done_ff <= next_wr_desc_done;
+      dma_error_ff    <= next_dma_error;
     end
   end
 endmodule

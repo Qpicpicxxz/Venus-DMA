@@ -16,11 +16,15 @@ typedef logic [31:0]                        desc_addr_t;
 typedef logic [`DMA_BYTES_WIDTH-1:0]        desc_num_t;
 typedef logic [FIFO_WIDTH:0]                fifo_sz_t;
 
-typedef enum logic {
+typedef enum logic [1:0] {
   // slave传来的read error
   DMA_AXI_RD_ERR,
   // slave传来的write error
-  DMA_AXI_WR_ERR
+  DMA_AXI_WR_ERR,
+  // 非narrow transfer，源/目的地址未对齐
+  DMA_UNALIGNED_ERR,
+  // narrow transfer，地址64byte越界
+  DMA_NARROW_CROSS_ERR
 } err_src_t;
 
 typedef enum logic {

@@ -62,8 +62,10 @@ module dma_func_wrapper
     // Streamer的接口 ｜ [valid/done]
     .dma_stream_rd_valid_o  (dma_stream_rd_valid_o),
     .dma_stream_rd_done_i   (dma_stream_rd_done_i),
+    .dma_stream_rd_err_i    (dma_stream_rd_err),
     .dma_stream_wr_valid_o  (dma_stream_wr_valid_o),
-    .dma_stream_wr_done_i   (dma_stream_wr_done_i)
+    .dma_stream_wr_done_i   (dma_stream_wr_done_i),
+    .dma_stream_wr_err_i    (dma_stream_wr_err)
   );
 
   // Read
@@ -78,7 +80,8 @@ module dma_func_wrapper
     .dma_axi_resp_i         (dma_axi_rd_resp),
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_rd_valid_o),
-    .dma_stream_done_o      (dma_stream_rd_done_i)
+    .dma_stream_done_o      (dma_stream_rd_done_i),
+    .dma_stream_err_o       (dma_stream_rd_err)
   );
 
   // Write
@@ -93,7 +96,8 @@ module dma_func_wrapper
     .dma_axi_resp_i         (dma_axi_wr_resp),
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_wr_valid_o),
-    .dma_stream_done_o      (dma_stream_wr_done_i)
+    .dma_stream_done_o      (dma_stream_wr_done_i),
+    .dma_stream_err_o       (dma_stream_wr_err)
   );
 
   dma_fifo u_dma_fifo(

@@ -116,23 +116,15 @@ module dma_axi_if
   //   end
   // endfunction
 
-  always_comb begin
-    // 告诉 FSM DMA正在运行
-    axi_pend_txn_o  = axi_txn_pend_ff;
-    next_rd_txn_req   = rd_txn_req_ff;
-    next_wr_txn_req   = wr_txn_req_ff;
+  always_comb begin: err_handler
+    next_err_lock   = err_lock_ff;
+    next_dma_error  = dma_error_ff;
     // 把错误信号输出给FSM，FSM传出去
     axi_dma_err_o   = dma_error_ff;
-    next_dma_error  = dma_error_ff;
 
-    // 给各个next信号赋初始值
-    next_axi_txn_pend = axi_txn_pend_ff;
-    next_err_lock     = err_lock_ff;
-    next_beat_count   = beat_counter_ff;
-
-    // DMA没有RUN的时候复位err_lock
+    // DMA没有RUN的时候不处理error
     if (~dma_active_i) begin
-      next_err_lock   = 1'b0;
+      next_err_lock = 1'b0;
     end
     else begin
       // 如果有错误发生，那么需要把错误锁住，以免多个错误导致error_o跳变
@@ -153,10 +145,23 @@ module dma_axi_if
       end
     end
 
-    // 如果DMA由DONE转为IDLE，清空lock和error信息
+
+
+    // 如果DMA由DONE转为IDLE，清空error信息
     if (clear_dma_i) begin
       next_dma_error = s_dma_error_t'('0);
     end
+  end : err_handler
+
+  always_comb begin
+    // 告诉 FSM DMA正在运行
+    axi_pend_txn_o    = axi_txn_pend_ff;
+    next_rd_txn_req   = rd_txn_req_ff;
+    next_wr_txn_req   = wr_txn_req_ff;
+
+    // 给各个next信号赋初始值
+    next_axi_txn_pend = axi_txn_pend_ff;
+    next_beat_count   = beat_counter_ff;
 
     // 握手 / 响应
     rd_txn_hpn  = axi_req_o.arvalid && axi_resp_i.arready;
@@ -191,10 +196,11 @@ module dma_axi_if
   end
 
   always_comb begin : axi4_master
-    axi_req_o         = axi_req_t'('0);         // 给AXI总线的信号
-    dma_fifo_req_o    = s_dma_fifo_req_t'('0);  // 给数据缓存FIFO的信号 [wr | rd | wr_data]
+    // 负责捕捉错误信号
     rd_err_hpn        = 1'b0;
     wr_err_hpn        = 1'b0;
+    axi_req_o         = axi_req_t'('0);         // 给AXI总线的信号
+    dma_fifo_req_o    = s_dma_fifo_req_t'('0);  // 给数据缓存FIFO的信号 [wr | rd | wr_data]
     dma_axi_rd_resp_o = s_dma_axi_resp_t'('0);  // ready信号是去告诉valid源可以拉低了[已经握手成功]
     dma_axi_wr_resp_o = s_dma_axi_resp_t'('0);  // ready
     next_aw_txn       = aw_txn_started_ff;
@@ -223,6 +229,7 @@ module dma_axi_if
         if (axi_resp_i.r.rlast && axi_req_o.rready) begin
           // 10 - SLVERR「Slave错误」 | 10 - DECERR「总线解码错误」
           rd_err_hpn = (axi_resp_i.r.rresp == 2'b10) || (axi_resp_i.r.rresp == 2'b11);
+          // rd_err_hpn = 1'b1;
         end
       end
 

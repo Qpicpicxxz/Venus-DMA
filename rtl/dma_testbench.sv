@@ -112,20 +112,26 @@ initial begin
   dma_desc.src_addr     = NARROW_SRC;
   dma_desc.dst_addr     = NARROW_DST;
   dma_desc.num_bytes    = 32'hb; // 11byte
+  // dma_desc.num_bytes    = 32'h39; // cross 64byte-boundary
+  // dma_desc.num_bytes    = 32'h800; // not narrow transfer, address unaligned
 
   $display("[%0t]: Enable DMA to transfer data...", $time);
   dma_go_i       = 1'b1;
   repeat(1) @(posedge clk);
   dma_go_i       = 1'b0;
-  repeat(10) @(posedge clk);
-
   repeat(50) begin
   @(posedge clk);
-  if (dma_stats.done == 1'b1) begin
+  if (dma_stats.error == 1'b1) begin
+    $display("[%0t]: DMA transfer error...", $time);
+    break;
+  end
+  else if (dma_stats.done == 1'b1) begin
       $display("[%0t]: DMA transfer completed...", $time);
       break;
     end
   end
+  repeat(10) @(posedge clk);
+  // $stop;
 
   $display("[%0t]: Change memory control source to BFM...", $time);
   master_ctrl = 1'b0;
