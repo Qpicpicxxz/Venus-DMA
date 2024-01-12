@@ -1,5 +1,5 @@
 module dma_fifo
-  import axi_pkg::*;
+  import venus_soc_pkg::*;
   import dma_pkg::*;
 #(
   parameter int SLOTS = `DMA_FIFO_DEPTH,  // 槽的深度

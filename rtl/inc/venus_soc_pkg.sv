@@ -1,4 +1,4 @@
-package axi_pkg;
+package venus_soc_pkg;
 
 parameter DATA_BUS_WIDTH = 512;
 parameter ID_BUS_WIDTH = 7;  // 可配置「与L2设置齐平」

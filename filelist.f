@@ -1,4 +1,4 @@
-./rtl/inc/axi_pkg.sv
+./rtl/inc/venus_soc_pkg.sv
 ./rtl/inc/dma_pkg.sv
 
 ./rtl/dma/dma_axi_if.sv

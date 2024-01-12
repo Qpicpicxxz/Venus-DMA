@@ -1,4 +1,4 @@
-module Multiplexer import axi_pkg::*; #(
+module Multiplexer import venus_soc_pkg::*; #(
 )(
   input             master_ctrl,
   input  axi_req_t  axi_req_o_dma,

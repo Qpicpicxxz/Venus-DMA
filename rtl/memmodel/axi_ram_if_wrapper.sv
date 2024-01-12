@@ -2,7 +2,7 @@
 //Create time:2023.3.30 18:53
 //
 
-module axi_ram_if_wrapper import axi_pkg::*; #(
+module axi_ram_if_wrapper import venus_soc_pkg::*; #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 16,
     parameter STRB_WIDTH = (DATA_WIDTH/8),

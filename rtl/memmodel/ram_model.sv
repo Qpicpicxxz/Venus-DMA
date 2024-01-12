@@ -2,7 +2,7 @@
 //Create time:2023.3.30 15:12
 //
 
-module ram_model import axi_pkg::*; #(
+module ram_model import venus_soc_pkg::*; #(
     parameter DATA_WIDTH = 64,
     parameter ADDR_WIDTH = 32,
     parameter ID_WIDTH = 8,

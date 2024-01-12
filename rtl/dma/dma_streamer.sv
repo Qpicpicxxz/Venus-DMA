@@ -1,6 +1,6 @@
 // Streamder：DMA操作中数据流控制，处理数据的读写操作
 module dma_streamer
-  import axi_pkg::*;
+  import venus_soc_pkg::*;
   import dma_pkg::*;
 #(
   parameter bit STREAM_TYPE = 0 // 0 - Read, 1 - Write

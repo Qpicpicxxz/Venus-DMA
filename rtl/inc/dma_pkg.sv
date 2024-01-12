@@ -1,5 +1,5 @@
 package dma_pkg;
-import axi_pkg::*;
+import venus_soc_pkg::*;
 `define DMA_DATA_WIDTH        DATA_BUS_WIDTH
 `define DMA_NUM_DESC          2
 // 记录需要DMA传输数据比特长度的容器宽度

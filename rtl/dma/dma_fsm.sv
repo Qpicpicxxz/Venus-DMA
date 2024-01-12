@@ -1,5 +1,5 @@
 module dma_fsm
-  import axi_pkg::*;
+  import venus_soc_pkg::*;
   import dma_pkg::*;
 (
   input                                     clk,

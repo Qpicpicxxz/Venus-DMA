@@ -1,6 +1,6 @@
 module dma_func_wrapper
   import dma_pkg::*;
-  import axi_pkg::*;
+  import venus_soc_pkg::*;
 (
   input                                     clk,
   input                                     rstn,

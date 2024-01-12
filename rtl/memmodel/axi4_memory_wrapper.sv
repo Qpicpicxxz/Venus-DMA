@@ -2,7 +2,7 @@
 //Create time:2023.2.18 14:21
 //
 
-module axi4_memory_wrapper import axi_pkg::*; #(
+module axi4_memory_wrapper import venus_soc_pkg::*; #(
     parameter useSMICModel = 1,
     parameter DATA_WIDTH = 64,   // data bus width in bits, default = 64
     parameter ADDRESS_WIDTH = 32,

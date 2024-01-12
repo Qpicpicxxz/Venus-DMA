@@ -8,7 +8,7 @@ parameter NARROW_DST       = 32'h1400_0127;
 parameter TRANSFER_SRC     = 32'h1100_0100;
 parameter TRANSFER_DST     = 32'h1400_0100;
 
-import axi_pkg::*;
+import venus_soc_pkg::*;
 import dma_pkg::*;
 
 logic clk;
@@ -116,7 +116,7 @@ input int byte_num;
 int num = byte_num / 64;
   repeat(repeat_num) begin
     desc.randomize();
-    $display("[%0t] testing %d-bytes transfer, src = %h, dst = %h", $time, byte_num, desc.src, desc.dst)
+    $display("[%0t] testing %d-bytes transfer, src = %h, dst = %h", $time, byte_num, desc.src, desc.dst);
     for (int i = 0; i < num; i++) begin
       ddr_model[desc.dst + (32'h40 * i)]=ddr_model[desc.src + (32'h40 * i)];
     end

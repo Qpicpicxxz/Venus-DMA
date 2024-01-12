@@ -2,7 +2,7 @@
 //Create time:2023.2.14 19:54
 //
 `include "cdn_axi4_master_bfm.vh"
-module cdn_axi4_master_bfm_wrapper import axi_pkg::*; #(
+module cdn_axi4_master_bfm_wrapper import venus_soc_pkg::*; #(
    parameter NAME = "MASTER_0",
    parameter DATA_BUS_WIDTH = 512,
    parameter ADDRESS_BUS_WIDTH = 32,
