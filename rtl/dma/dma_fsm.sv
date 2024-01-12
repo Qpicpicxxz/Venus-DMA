@@ -73,8 +73,9 @@ module dma_fsm
       end
     endcase
 
-    dma_stats_o.done  = (cur_st_ff == DMA_ST_DONE);
-    clear_dma_o       = (cur_st_ff == DMA_ST_DONE) && (next_st == DMA_ST_IDLE);
+    dma_stats_o.done   = (cur_st_ff == DMA_ST_DONE);
+    dma_stats_o.active = (cur_st_ff == DMA_ST_RUN);
+    clear_dma_o        = (cur_st_ff == DMA_ST_DONE) && (next_st == DMA_ST_IDLE);
   end : dma_fsm
 
   // Read streamer

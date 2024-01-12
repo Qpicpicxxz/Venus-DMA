@@ -45,8 +45,9 @@ module dma_axi_if
    * [bready]  - 要写入slave的master数据已经准备好
    */
 
-  /* 寄存器 */
-  logic         axi_txn_pend_ff, next_axi_txn_pend; // DMA工作状态寄存
+  /* 统计 + 寄存 Read or Write streamer传来的事物个数与请求 */
+  logic [3:0]   rd_counter_ff, next_rd_counter;
+  logic [3:0]   wr_counter_ff, next_wr_counter;
   s_rd_req_t    rd_txn_req_ff,   next_rd_txn_req;   // Stream传来的读操作信息寄存 | `s_rd_req_t`: raddr[读地址] ｜ rstrb[掩码]
   s_wr_req_t    wr_txn_req_ff,   next_wr_txn_req;   // Stream传来的写操作信息寄存 | `s_wr_req_t`: waddr[写地址] ｜ awlen[次数] | wstrb[掩码]
   /* 握手交互信号 */
@@ -61,6 +62,7 @@ module dma_axi_if
   s_dma_error_t dma_error_ff, next_dma_error;
   /* 记录写打拍，决定什么时候拉高w.wlast */
   logic         wr_beat_hpn;
+  logic         wr_beat_finish;
   axi_len_t     beat_counter_ff, next_beat_count;
   /* 寄存写事物传输状态[如果slave的awready消失了] */
   logic         aw_txn_started_ff, next_aw_txn;
@@ -145,8 +147,6 @@ module dma_axi_if
       end
     end
 
-
-
     // 如果DMA由DONE转为IDLE，清空error信息
     if (clear_dma_i) begin
       next_dma_error = s_dma_error_t'('0);
@@ -155,26 +155,38 @@ module dma_axi_if
 
   always_comb begin
     // 告诉 FSM DMA正在运行
-    axi_pend_txn_o    = axi_txn_pend_ff;
-    next_rd_txn_req   = rd_txn_req_ff;
-    next_wr_txn_req   = wr_txn_req_ff;
-
-    // 给各个next信号赋初始值
-    next_axi_txn_pend = axi_txn_pend_ff;
-    next_beat_count   = beat_counter_ff;
+    axi_pend_txn_o  = (|rd_counter_ff) || (|wr_counter_ff);
+    next_rd_counter = rd_counter_ff;
+    next_wr_counter = wr_counter_ff;
+    next_rd_txn_req = rd_txn_req_ff;
+    next_wr_txn_req = wr_txn_req_ff;
+    next_beat_count = beat_counter_ff;
 
     // 握手 / 响应
-    rd_txn_hpn  = axi_req_o.arvalid && axi_resp_i.arready;
-    rd_resp_hpn = axi_resp_i.rvalid && axi_resp_i.r.rlast  && axi_req_o.rready;
-    wr_txn_hpn  = axi_req_o.awvalid && axi_resp_i.awready;
-    wr_beat_hpn = axi_req_o.wvalid  && axi_resp_i.wready;
-    wr_resp_hpn = axi_resp_i.bvalid && axi_req_o.bready;
+    rd_txn_hpn      = axi_req_o.arvalid && axi_resp_i.arready;
+    rd_resp_hpn     = axi_resp_i.rvalid && axi_resp_i.r.rlast  && axi_req_o.rready;
+    wr_txn_hpn      = axi_req_o.awvalid && axi_resp_i.awready;
+    wr_beat_hpn     = axi_req_o.wvalid  && axi_resp_i.wready;
+    wr_beat_finish  = axi_req_o.wvalid  && axi_req_o.w.wlast   && axi_resp_i.wready;
+    wr_resp_hpn     = axi_resp_i.bvalid && axi_req_o.bready;
+
+    if (dma_active_i) begin
+      if (rd_txn_hpn || rd_resp_hpn) begin
+        next_rd_counter = rd_counter_ff + (rd_txn_hpn ? 'd1 : 'd0) - (rd_resp_hpn ? 'd1 : 'd0);
+      end
+
+      if (wr_txn_hpn || wr_resp_hpn) begin
+        next_wr_counter = wr_counter_ff + (wr_txn_hpn ? 'd1 : 'd0) - (wr_resp_hpn ? 'd1 : 'd0);
+      end
+    end else begin
+      next_rd_counter = 'd0;
+      next_wr_counter = 'd0;
+    end
 
     // 一旦read握手成功，将stream传过来的读信息寄存下来，将输出给FSM的pend拉高
     if(rd_txn_hpn) begin
       next_rd_txn_req.raddr = dma_axi_rd_req_i.addr;
       next_rd_txn_req.rstrb = dma_axi_rd_req_i.strb;
-      next_axi_txn_pend = 1'b1;
     end
 
     // 一旦write握手成功，将stream传过来的写信息寄存下来
@@ -184,14 +196,14 @@ module dma_axi_if
       next_wr_txn_req.waddr = dma_axi_wr_req_i.addr;
     end
 
-    // 一旦write response传来，拉低输出给FSM的pend
-    if (wr_resp_hpn) begin
-      next_axi_txn_pend = 1'b0;
-    end
-
     // 写打拍
     if (wr_beat_hpn) begin
       next_beat_count = beat_counter_ff + 'd1;
+    end
+
+    // 写打拍复位
+    if (wr_beat_finish) begin
+      next_beat_count = 0;
     end
   end
 
@@ -264,7 +276,8 @@ module dma_axi_if
 
   always_ff @ (posedge clk) begin
     if (~rstn) begin
-      axi_txn_pend_ff   <= 1'b0;
+      rd_counter_ff     <= 'b0;
+      wr_counter_ff     <= 'b0;
       rd_txn_req_ff     <= s_rd_req_t'(0);
       wr_txn_req_ff     <= s_wr_req_t'(0);
       err_lock_ff       <= 1'b0;
@@ -273,7 +286,8 @@ module dma_axi_if
       aw_txn_started_ff <= 1'b0;
     end
     else begin
-      axi_txn_pend_ff   <= next_axi_txn_pend;
+      rd_counter_ff     <= next_rd_counter;
+      wr_counter_ff     <= next_wr_counter;
       rd_txn_req_ff     <= next_rd_txn_req;
       wr_txn_req_ff     <= next_wr_txn_req;
       err_lock_ff       <= next_err_lock;

@@ -54,6 +54,7 @@ typedef struct packed {
 typedef struct packed {
   logic       error;
   logic       done;
+  logic       active;
 } s_dma_status_t;
 
 // Interface between DMA Streamer and DMA AXI
