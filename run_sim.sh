@@ -38,7 +38,8 @@ vlogan  -full64 -kdb -sverilog +v2k -v2k_generate \
         -l compile_vlog.log  \
 				+incdir+./rtl/inc \
         -timescale=1ns/1ps   \
-				-assert svaext
+				-assert svaext \
+        ${BEHAV_SIM}
 
 # `vcs`：使用VCS编译器
 # `test`：指定要编译的测试文件/顶层模块的名称

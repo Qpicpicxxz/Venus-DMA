@@ -5,7 +5,7 @@ import venus_soc_pkg::*;
 // 记录需要DMA传输数据比特长度的容器宽度
 `define DMA_BYTES_WIDTH       32
 // FIFO size in bytes = (DMA_FIFO_DEPTH*(AXI_DATA_WIDTH/8))
-`define DMA_FIFO_DEPTH        16 // Must be power of 2
+`define DMA_FIFO_DEPTH        256 // Must be power of 2
 `define DMA_ID_WIDTH          `AXI_TXN_ID_WIDTH
 `define DMA_MAX_BEAT_BURST    256 // 1 up to 256
 `define DMA_MAX_BURST_EN      1

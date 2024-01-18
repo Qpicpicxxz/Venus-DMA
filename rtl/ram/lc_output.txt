@@ -1,0 +1,23 @@
+
+Initializing...
+read_lib ./SRAMdpw64d256_tt_1p10v_1p10v_85c.lib
+Reading '/home/huhaiqin/venus_dma/rtl/ram/SRAMdpw64d256_tt_1p10v_1p10v_85c.lib' ...
+Warning: Line 65, The 'internal_power_calculation' attribute in char_config group is required for NLPM library. 
+        No default can be applied to this attribute. (LBDB-366)
+Warning: Line 17721, Cell 'SRAMdpw64d256', pin 'EMAA[2]', The pin 'EMAA[2]' does not have a internal_power group. (LBDB-607)
+Warning: Line 17795, Cell 'SRAMdpw64d256', pin 'EMAWA[1]', The pin 'EMAWA[1]' does not have a internal_power group. (LBDB-607)
+Warning: Line 17869, Cell 'SRAMdpw64d256', pin 'EMAB[2]', The pin 'EMAB[2]' does not have a internal_power group. (LBDB-607)
+Warning: Line 17943, Cell 'SRAMdpw64d256', pin 'EMAWB[1]', The pin 'EMAWB[1]' does not have a internal_power group. (LBDB-607)
+Warning: Line 19201, Cell 'SRAMdpw64d256', pin 'RET1N', is a 'save_restore' class retention pin but is missing all recommended attributes. (LBDB-982)
+Warning: Line 20269, Cell 'SRAMdpw64d256', pin 'COLLDISN', The pin 'COLLDISN' does not have a internal_power group. (LBDB-607)
+Technology library 'USERLIB_tt_1p10v_1p10v_85c' read successfully
+1
+write_lib USERLIB_tt_1p10v_1p10v_85c -format db -output ../output_db/SRAMdpw64d256_tt_1p10v_1p10v_85c.db
+Wrote the 'USERLIB_tt_1p10v_1p10v_85c' library to '/home/huhaiqin/venus_dma/rtl/ram/../output_db/SRAMdpw64d256_tt_1p10v_1p10v_85c.db' successfully
+1
+exit
+Maximum memory usage for this session: 122.91 MB
+CPU usage for this session:      3 seconds (  0.00 hours)
+Elapsed time for this session:      3 seconds (  0.00 hours)
+Thank you for using Library Compiler.
+

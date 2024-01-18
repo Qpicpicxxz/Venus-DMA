@@ -15,6 +15,32 @@ module dma_fifo
   output  logic                   full_o, // 是否满了
   output  logic                   empty_o // 是否空了
 );
+
+
+//SLOTS = 256
+//WIDTH = 512
+logic [WIDTH-1:0]       new_data_o;
+logic                   new_full_o;
+logic                   new_empty_o;
+commonclkBRAMfifo_to_asicfifo_wrapper
+#(
+    .WIDTH        (WIDTH),
+    .DEPTH        (SLOTS),
+    .OUTPUT_DELAY (1),
+    .MANUAL_CONFIG("SRAMdpw512d256")
+)(
+    .clk(clk),
+    .srst(~rstn),
+    .din(data_i),
+    .wr_en(write_i),
+    .rd_en(read_i),
+    .dout(new_data_o),
+    .full(new_full_o),
+    .empty(new_empty_o)
+);
+
+
+
   // `MSB`: Most Significant Bit 最高有效位
   `define MSB_SLOT  $clog2(SLOTS>1?SLOTS:2)
   typedef logic [`MSB_SLOT:0] msb_t;  // 定义一个能装下SLOT最大数字并空闲一位的结构

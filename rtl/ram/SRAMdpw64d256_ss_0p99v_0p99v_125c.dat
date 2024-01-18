@@ -1,0 +1,242 @@
+# datatable_memcomp Version: 4.0.5-beta17
+# common_memcomp Version: 4.0.5-beta20
+# lang compiler Version: 4.1.6-beta1 Jul 19 2012 13:55:19 
+# High Density Dual Port SRAM RVT RVT Compiler 
+#  LOGIC0040LL 40nm Process 0.589um^2 Bit Cell, RAM-DP Datatable, Version r1p1
+# Copyright 1993-2024 ARM Limited. All Rights Reserved
+# Instance Name=SRAMdpw64d256
+# Process=LOGIC0040LL 
+# Words=256 
+# Bits=64 
+# Mux=4 
+# Write Mask=off 
+# Extra Margin Adjustment=on 
+# Redundancy=off 
+# Soft Error Repair=none 
+# BIST Muxes=on 
+# Output Drive=6 
+# Power Routing Type=otc 
+# Top Metal=m5-m10 
+# Frequency=1 MHz 
+# Power Gating=off 
+# Retention=on 
+# Back Biasing=off 
+# Read Disturb Test=off 
+# Pipeline=off 
+# Write-thru=off 
+# Units used in Datatable
+# Area          : uM^2
+# Voltage       : volts
+# Temperature   : Degree Celsius
+# Current       : mA
+# Time          : ns
+name      	ss_0p99v_0p99v_125c	
+S		N
+geomx     	442.4300  
+geomy     	69.9450   
+volt      	0.9900    
+temp      	125.0000  
+# Cycle time specific information. 
+tcyc_ema0 	2.2494    
+tcyc_ema1 	2.3596    
+tcyc_ema2 	2.4472    
+tcyc_ema3 	2.5252    
+tcyc_ema4 	2.7248    
+tcyc_ema5 	2.8599    
+tcyc_ema6 	3.0260    
+tcyc_ema7 	3.1549    
+# Access time specific information. 
+taccq_rd0 	1.6001    
+taccq_rd1 	1.7103    
+taccq_rd2 	1.7979    
+taccq_rd3 	1.8759    
+taccq_rd4 	2.0755    
+taccq_rd5 	2.2106    
+taccq_rd6 	2.3767    
+taccq_rd7 	2.5056    
+taccq_scan	0.8015    
+# Scan delay time specific information. 
+tclkso_rd0	1.8016    
+tclkso_rd1	1.9117    
+tclkso_rd2	1.9994    
+tclkso_rd3	2.0774    
+tclkso_rd4	2.2770    
+tclkso_rd5	2.4121    
+tclkso_rd6	2.5781    
+tclkso_rd7	2.7071    
+tclkso_scan	1.0030    
+# Standard memory feature setuphold specific information. 
+tas       	0.3639    
+tah       	0.3224    
+tcens     	0.4089    
+tcenh     	0.3193    
+twens     	0.2742    
+twenh     	0.3144    
+tds       	0.1128    
+tdh       	0.3650    
+# Standard memory input capacitance information.  
+icap_a    	0.0033    
+icap_clk  	0.0129    
+icap_cen  	0.0032    
+icap_d    	0.0041    
+icap_wen  	0.0030    
+kload_q   	0.9686    
+# Clock collision specific information. 
+tcc_rd0   	1.1401    
+tcc_rd1   	1.2503    
+tcc_rd2   	1.3379    
+tcc_rd3   	1.4159    
+tcc_rd4   	1.6156    
+tcc_rd5   	1.7506    
+tcc_rd6   	1.9167    
+tcc_rd7   	2.0457    
+tcc_wr0   	1.1401    
+tcc_wr1   	1.2503    
+tcc_wr2   	1.3379    
+tcc_wr3   	1.4159    
+tcc_wr4   	1.6156    
+tcc_wr5   	1.7506    
+tcc_wr6   	1.9167    
+tcc_wr7   	2.0457    
+# Clock Phase specific information. 
+tckh      	0.3225    
+tckl      	0.2763    
+tckr      	0.7600    
+# Average Current specific information 
+icc_c_avg0	1.0855e-04
+icc_p_avg0	7.3750e-03
+icc_c_avg1	1.0855e-04
+icc_p_avg1	7.4240e-03
+icc_c_avg2	1.0855e-04
+icc_p_avg2	7.4730e-03
+icc_c_avg3	1.0855e-04
+icc_p_avg3	7.5221e-03
+icc_c_avg4	1.0855e-04
+icc_p_avg4	7.5711e-03
+icc_c_avg5	1.0855e-04
+icc_p_avg5	7.6201e-03
+icc_c_avg6	1.0855e-04
+icc_p_avg6	7.6691e-03
+icc_c_avg7	1.0855e-04
+icc_p_avg7	7.7181e-03
+# Read Current specific information 
+icc_c_rd0 	1.0590e-04
+icc_p_rd0 	9.4592e-03
+icc_c_rd1 	1.0590e-04
+icc_p_rd1 	9.5059e-03
+icc_c_rd2 	1.0590e-04
+icc_p_rd2 	9.5526e-03
+icc_c_rd3 	1.0590e-04
+icc_p_rd3 	9.5992e-03
+icc_c_rd4 	1.0590e-04
+icc_p_rd4 	9.6459e-03
+icc_c_rd5 	1.0590e-04
+icc_p_rd5 	9.6926e-03
+icc_c_rd6 	1.0590e-04
+icc_p_rd6 	9.7393e-03
+icc_c_rd7 	1.0590e-04
+icc_p_rd7 	9.7860e-03
+# Write Current specific information 
+icc_c_wr0 	1.1119e-04
+icc_p_wr0 	9.4718e-03
+icc_c_wr1 	1.1119e-04
+icc_p_wr1 	9.5231e-03
+icc_c_wr2 	1.1119e-04
+icc_p_wr2 	9.5745e-03
+icc_c_wr3 	1.1119e-04
+icc_p_wr3 	9.6258e-03
+icc_c_wr4 	1.1119e-04
+icc_p_wr4 	9.6772e-03
+icc_c_wr5 	1.1119e-04
+icc_p_wr5 	9.7285e-03
+icc_c_wr6 	1.1119e-04
+icc_p_wr6 	9.7799e-03
+icc_c_wr7 	1.1119e-04
+icc_p_wr7 	9.8312e-03
+# Peak current specific information
+icc_c_peak	7.0369    
+icc_p_peak	42.6770   
+# Deselect current specific information
+icc_c_desel	0.0000e+00
+icc_p_desel	2.0905e-03
+# Leakage Current specific information 
+icc_c_standby	4.4941e-03
+icc_p_standby	1.6700e-02
+icc_c_selective_precharge	4.9022e-03
+icc_p_selective_precharge	1.3241e-02
+icc_c_standby_ret1n	4.8197e-03
+icc_p_standby_ret1n	2.0464e-03
+# Clock noise limit specific information 
+pwn_clk   	0.1612    
+vn_clk    	0.3492    
+# Supply noise limit specific information 
+vn_pwr    	0.0990    
+vn_gnd    	0.0990    
+# EMA feature specific information.
+icap_ema  	0.0038    
+temas     	2.4472    
+temah     	3.8461    
+icap_emaw 	0.0038    
+temaws    	2.4472    
+temawh    	3.8461    
+# COLLDISN feature specific information.
+icap_colldisn	0.0025    
+tcolldisns	2.4472    
+tcolldisnh	3.8461    
+# BIST MUX feature input capacitance specific information. 
+icap_ten  	0.0054    
+icap_tcen 	0.0019    
+icap_ta   	0.0020    
+icap_twen 	0.0019    
+icap_td   	0.0044    
+kload_weny	3.9722    
+kload_ay  	3.9722    
+kload_ceny	3.9722    
+# BIST MUX feature delay specific information. 
+ttenceny  	0.7502    
+tcenceny  	0.3971    
+ttcenceny 	0.4804    
+tdftrambypceny	0.4128    
+ttenweny  	0.8127    
+twenweny  	0.3976    
+ttwenweny 	0.4792    
+tdftrambypweny	0.5813    
+ttenay    	0.7503    
+taay      	0.4102    
+ttaay     	0.5087    
+tdftrambypay	0.4034    
+# BMUX feature setuphold specific information. 
+ttens     	1.2828    
+ttenh     	0.2296    
+ttcens    	0.3849    
+ttcenh    	0.3316    
+ttas      	0.4786    
+ttah      	0.2915    
+ttwens    	0.2742    
+ttwenh    	0.2904    
+ttds      	0.1064    
+ttdh      	0.3610    
+# scan feature input capacitance specific information.
+icap_dftrambyp	0.0259    
+icap_si   	0.0041    
+icap_se   	0.0078    
+# Scan feature specific information. 
+tdftrambyps	0.3146    
+tdftrambyph	0.3338    
+tsis      	0.1128    
+tsih      	0.3610    
+tses      	1.4111    
+tseh      	0.2525    
+kload_so  	2.0131    
+# MTCMOS feature specific information.
+icap_ret1n	0.0026    
+# MTCMOS feature setuphold specific information.  
+tret1ns   	1.1464    
+tret1nh   	3.8461    
+# MTCMOS feature specific information : Protocol sequence timing checks.  
+tret1n_cenh	2.4472    
+tcen_ret1nh	2.4472    
+tret1n_dftrambyph	2.4472    
+tdftrambyp_ret1nh	2.4472    
+tret1n_tcenh	2.4472    
+ttcen_ret1nh	2.4472    

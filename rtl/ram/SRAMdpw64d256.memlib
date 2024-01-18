@@ -1,0 +1,324 @@
+/* logicvision_memcomp Version: 4.0.5-EAC1 */
+/* common_memcomp Version: 4.0.5-beta20 */
+/* lang compiler Version: 4.1.6-beta1 Jul 19 2012 13:55:19 */
+//
+//       CONFIDENTIAL AND PROPRIETARY SOFTWARE OF ARM PHYSICAL IP, INC.
+//      
+//       Copyright (c) 1993 - 2024 ARM Physical IP, Inc.  All Rights Reserved.
+//      
+//       Use of this Software is subject to the terms and conditions of the
+//       applicable license agreement with ARM Physical IP, Inc.
+//       In addition, this Software is protected by patents, copyright law 
+//       and international treaties.
+//      
+//       The copyright notice(s) in this Software does not indicate actual or
+//       intended publication of this Software.
+//
+//      logicvision model for Synchronous Dual-Port Ram
+//
+//      Instance Name:              SRAMdpw64d256
+//      Words:                      256
+//      Bits:                       64
+//      Mux:                        4
+//      Drive:                      6
+//      Write Mask:                 Off
+//      Extra Margin Adjustment:    On
+//      Redundant Rows:             0
+//      Redundant Columns:          0
+//      Test Muxes                  On
+//
+//      Creation Date:  Tue Jan 16 16:37:38 2024
+//      Version: 	r1p1
+//
+//      Modeling Assumptions: 
+//
+//      Modeling Limitations: None
+//
+//      Known Bugs: None.
+//
+//      Known Work Arounds: N/A
+//
+MemoryTemplate (SRAMdpw64d256) {
+	Algorithm : SmarchChkbvcd;
+	DataOutStage : None;
+	LogicalPorts : 2RW;
+	BitGrouping : 1;
+	MemoryType : SRAM;
+	MinHold : 0.5;
+	OperationSet : SyncWR;
+	SelectDuringWriteThru : Off;
+	ShadowRead : On;
+	ShadowWrite : On;
+        TransparentMode : None;
+        ObservationLogic: On;
+        InternalScanLogic: On;
+	CellName : SRAMdpw64d256;
+	NumberOfWords : 256;
+	AddressCounter{
+		Function (Address) {
+			LogicalAddressMap{
+				ColumnAddress[1:0] : Address[1:0];
+				RowAddress[5:0] : Address[7:2];
+			}
+		}
+		Function (ColumnAddress) {
+			CountRange [0:3];
+			}
+		Function (RowAddress) {
+			CountRange [0:63];
+		}
+	}
+	PhysicalAddressMap{
+		ColumnAddress[0] : c[0];
+		ColumnAddress[1] : c[1];
+		RowAddress[0] : r[0];
+		RowAddress[1] : r[1];
+		RowAddress[2] : r[2];
+		RowAddress[3] : r[3];
+		RowAddress[4] : r[4];
+		RowAddress[5] : r[5];
+	}
+	PhysicalDataMap{
+		Data[0] : NOT d[0];
+		Data[1] : NOT d[1];
+		Data[2] : NOT d[2];
+		Data[3] : NOT d[3];
+		Data[4] : NOT d[4];
+		Data[5] : NOT d[5];
+		Data[6] : NOT d[6];
+		Data[7] : NOT d[7];
+		Data[8] : NOT d[8];
+		Data[9] : NOT d[9];
+		Data[10] : NOT d[10];
+		Data[11] : NOT d[11];
+		Data[12] : NOT d[12];
+		Data[13] : NOT d[13];
+		Data[14] : NOT d[14];
+		Data[15] : NOT d[15];
+		Data[16] : NOT d[16];
+		Data[17] : NOT d[17];
+		Data[18] : NOT d[18];
+		Data[19] : NOT d[19];
+		Data[20] : NOT d[20];
+		Data[21] : NOT d[21];
+		Data[22] : NOT d[22];
+		Data[23] : NOT d[23];
+		Data[24] : NOT d[24];
+		Data[25] : NOT d[25];
+		Data[26] : NOT d[26];
+		Data[27] : NOT d[27];
+		Data[28] : NOT d[28];
+		Data[29] : NOT d[29];
+		Data[30] : NOT d[30];
+		Data[31] : NOT d[31];
+		Data[32] : d[32];
+		Data[33] : d[33];
+		Data[34] : d[34];
+		Data[35] : d[35];
+		Data[36] : d[36];
+		Data[37] : d[37];
+		Data[38] : d[38];
+		Data[39] : d[39];
+		Data[40] : d[40];
+		Data[41] : d[41];
+		Data[42] : d[42];
+		Data[43] : d[43];
+		Data[44] : d[44];
+		Data[45] : d[45];
+		Data[46] : d[46];
+		Data[47] : d[47];
+		Data[48] : d[48];
+		Data[49] : d[49];
+		Data[50] : d[50];
+		Data[51] : d[51];
+		Data[52] : d[52];
+		Data[53] : d[53];
+		Data[54] : d[54];
+		Data[55] : d[55];
+		Data[56] : d[56];
+		Data[57] : d[57];
+		Data[58] : d[58];
+		Data[59] : d[59];
+		Data[60] : d[60];
+		Data[61] : d[61];
+		Data[62] : d[62];
+		Data[63] : d[63];
+	}
+	Port (AA[7:0]) {
+		Function : Address;
+		LogicalPort : A;
+		EmbeddedTestLogic {
+			TestInput : TAA[7:0];
+			TestOutput : AYA[7:0];
+		}
+	}
+	Port (DA[63:0]) {
+		Function : Data;
+		Direction : input;
+		LogicalPort : A;
+		EmbeddedTestLogic {
+			TestInput : TDA[63:0];
+		}
+	}
+	Port (QA[63:0]) {
+		Function : Data;
+		Direction : output;
+		LogicalPort : A;
+	}
+	Port (WENA) {
+		Function : WriteEnable;
+		LogicalPort : A;
+		Polarity : ActiveLow;
+		EmbeddedTestLogic {
+			TestInput : TWENA;
+			TestOutput : WENYA;
+		}
+	}
+	Port (CENA) {
+		Function : Select;
+		LogicalPort : A;
+		Polarity : ActiveLow;
+		EmbeddedTestLogic {
+			TestInput : TCENA;
+			TestOutput : CENYA;
+		}
+	}
+	Port (TENA) {
+		Function : BISTOn;
+		Direction : Input;
+		LogicalPort : A;
+		Polarity : ActiveLow;
+	}
+	Port (CLKA) {
+		Function : Clock;
+		LogicalPort : A;
+		Polarity : ActiveHigh;
+	}
+	Port (EMAA[2:0]) {
+		Function : None;
+		SafeValue : 0;
+		Direction : Input;
+		LogicalPort : A;
+		Polarity : ActiveHigh;
+	}
+	Port (EMAWA[1:0]) {
+		Function : None;
+		SafeValue : 0;
+		Direction : Input;
+		LogicalPort : A;
+		Polarity : ActiveHigh;
+	}
+  port (SEA){
+          Function : None;
+          Direction : Input;
+          SafeValue : 0;
+          Polarity : ActiveHigh;
+  }
+  port (SIA[1:0]){
+          Function : None;
+          Direction : Input;
+          SafeValue : 0;
+          Polarity : ActiveHigh;
+  }
+  port (SOA[1:0]){
+          Function : None;
+          Direction : Output;
+  }
+  port (DFTRAMBYP){
+          Function : ScanTest;
+          Direction : Input;
+          Polarity : ActiveHigh;
+  }
+	Port (AB[7:0]) {
+		Function : Address;
+		LogicalPort : B;
+		EmbeddedTestLogic {
+			TestInput : TAB[7:0];
+			TestOutput : AYB[7:0];
+		}
+	}
+	Port (DB[63:0]) {
+		Function : Data;
+		Direction : input;
+		LogicalPort : B;
+		EmbeddedTestLogic {
+			TestInput : TDB[63:0];
+		}
+	}
+	Port (QB[63:0]) {
+		Function : Data;
+		Direction : output;
+		LogicalPort : B;
+	}
+	Port (WENB) {
+		Function : WriteEnable;
+		LogicalPort : B;
+		Polarity : ActiveLow;
+		EmbeddedTestLogic {
+			TestInput : TWENB;
+			TestOutput : WENYB;
+		}
+	}
+	Port (CENB) {
+		Function : Select;
+		LogicalPort : B;
+		Polarity : ActiveLow;
+		EmbeddedTestLogic {
+			TestInput : TCENB;
+			TestOutput : CENYB;
+		}
+	}
+	Port (TENB) {
+		Function : BISTOn;
+		Direction : Input;
+		LogicalPort : B;
+		Polarity : ActiveLow;
+	}
+	Port (CLKB) {
+		Function : Clock;
+		LogicalPort : B;
+		Polarity : ActiveHigh;
+	}
+	Port (EMAB[2:0]) {
+		Function : None;
+		SafeValue : 0;
+		Direction : Input;
+		LogicalPort : B;
+		Polarity : ActiveHigh;
+	}
+	Port (EMAWB[1:0]) {
+		Function : None;
+		SafeValue : 0;
+		Direction : Input;
+		LogicalPort : B;
+		Polarity : ActiveHigh;
+	}
+	Port (COLLDISN) {
+             Function : None;
+             SafeValue : 1;
+             Direction : Input;
+             Polarity : ActiveLow;
+       }
+  port (SEB){
+          Function : None;
+          Direction : Input;
+          SafeValue : 0;
+          Polarity : ActiveHigh;
+  }
+  port (SIB[1:0]){
+          Function : None;
+          Direction : Input;
+          SafeValue : 0;
+          Polarity : ActiveHigh;
+  }
+  port (SOB[1:0]){
+          Function : None;
+          Direction : Output;
+  }
+	port (RET1N){
+		Function : None;
+		Direction : Input;
+		SafeValue : 1;
+		Polarity : Activelow;
+	}
+}

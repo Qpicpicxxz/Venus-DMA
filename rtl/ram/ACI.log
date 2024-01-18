@@ -1,0 +1,50 @@
+Spreadsheet updated
+ARM Physical IP, Inc.
+CentOS Linux release 7.9.2009 (Core)
+Linux localhost.localdomain 3.10.0-1160.el7.x86_64 #1 SMP Mon Oct 19 16:18:59 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
+Compiler version r1p1
+GUI version 8.2.6
+
+
+CONFIDENTIAL AND PROPRIETARY SOFTWARE OF ARM PHYSICAL IP, INC.
+
+Copyright (c) 1993 - 2024 ARM Physical IP, Inc.  All Rights Reserved.
+
+Use of this Software is subject to the terms and conditions of the
+applicable license agreement with ARM Physical IP, Inc. 
+In addition, this Software is protected by patents, copyright law 
+and international treaties.
+
+The copyright notice(s) in this Software does not indicate actual or
+intended publication of this Software.
+
+
+High Density Dual Port SRAM RVT RVT Compiler, LOGIC0040LL 40nm Process 0.589um^2 Bit Cell
+Log file is ACI.log
+
+ERROR: bits 64 must be within 4 to 20 for mux 16
+
+INFO: couldn't run spreadsheet generator to fetch results
+Spreadsheet updated
+cmd: /usr/smic40/sram_dp_hde_rvt_rvt/r1p1/bin/sram_dp_hde_rvt_rvt ascii -name_case upper -mvt "" -ser none -bus_notation on -site_def off -check_instname on -frequency 1.0 -bmux on -diodes on -activity_factor 50 -words 256 -drive 6 -power_type otc -bits 64 -instname SRAMdpw64d256 -retention on -libertyviewstyle nldm -write_mask off -left_bus_delim "[" -right_bus_delim "]" -pwr_gnd_rename vddpe:VDDPE,vddce:VDDCE,vsse:VSSE -rows_p_bl 256 -wp_size 1 -libname USERLIB -write_thru off -cust_comment "" -prefix "" -mux 16 -top_layer m5-m10 -back_biasing off -ema on -corners ss_0p99v_0p99v_0c,ss_0p99v_0p99v_125c,ss_0p99v_0p99v_m40c
+ERROR: bits 64 must be within 4 to 20 for mux 16
+
+cmd: /usr/smic40/sram_dp_hde_rvt_rvt/r1p1/bin/sram_dp_hde_rvt_rvt ascii -name_case upper -mvt "" -ser none -bus_notation on -site_def off -check_instname on -frequency 1.0 -bmux on -diodes on -activity_factor 50 -words 256 -drive 6 -power_type otc -bits 64 -instname SRAMdpw64d256 -retention on -libertyviewstyle nldm -write_mask off -left_bus_delim "[" -right_bus_delim "]" -pwr_gnd_rename vddpe:VDDPE,vddce:VDDCE,vsse:VSSE -rows_p_bl 256 -wp_size 1 -libname USERLIB -write_thru off -cust_comment "" -prefix "" -mux 16 -top_layer m5-m10 -back_biasing off -ema on -corners ss_0p99v_0p99v_0c,ss_0p99v_0p99v_125c,ss_0p99v_0p99v_m40c
+ERROR: bits 64 must be within 4 to 20 for mux 16
+
+Spreadsheet updated
+cmd: /usr/smic40/sram_dp_hde_rvt_rvt/r1p1/bin/sram_dp_hde_rvt_rvt ascii -name_case upper -mvt "" -ser none -bus_notation on -site_def off -check_instname on -frequency 1.0 -bmux on -diodes on -activity_factor 50 -words 256 -drive 6 -power_type otc -bits 16 -instname SRAMdpw64d256 -retention on -libertyviewstyle nldm -write_mask off -left_bus_delim "[" -right_bus_delim "]" -pwr_gnd_rename vddpe:VDDPE,vddce:VDDCE,vsse:VSSE -rows_p_bl 256 -wp_size 1 -libname USERLIB -write_thru off -cust_comment "" -prefix "" -mux 16 -top_layer m5-m10 -back_biasing off -ema on -corners ss_0p99v_0p99v_0c,ss_0p99v_0p99v_125c,ss_0p99v_0p99v_m40c
+INFO: Canceled!
+INFO: ascii generator failed
+
+Spreadsheet updated
+cmd: /usr/smic40/sram_dp_hde_rvt_rvt/r1p1/bin/sram_dp_hde_rvt_rvt ascii -name_case upper -mvt "" -ser none -bus_notation on -site_def off -check_instname on -frequency 1.0 -bmux on -diodes on -activity_factor 50 -words 256 -drive 6 -power_type otc -bits 64 -instname SRAMdpw64d256 -retention on -libertyviewstyle nldm -write_mask off -left_bus_delim "[" -right_bus_delim "]" -pwr_gnd_rename vddpe:VDDPE,vddce:VDDCE,vsse:VSSE -rows_p_bl 256 -wp_size 1 -libname USERLIB -write_thru off -cust_comment "" -prefix "" -mux 4 -top_layer m5-m10 -back_biasing off -ema on -corners ss_0p99v_0p99v_0c,ss_0p99v_0p99v_125c,ss_0p99v_0p99v_m40c
+ascii generator succeeded, created:
+   SRAMdpw64d256_ss_0p99v_0p99v_0c.dat
+   SRAMdpw64d256_ss_0p99v_0p99v_125c.dat
+   SRAMdpw64d256_ss_0p99v_0p99v_m40c.dat
+cmd: /usr/smic40/sram_dp_hde_rvt_rvt/r1p1/bin/sram_dp_hde_rvt_rvt ascii -name_case upper -mvt "" -ser none -bus_notation on -site_def off -check_instname on -frequency 1.0 -bmux on -diodes on -activity_factor 50 -words 256 -drive 6 -power_type otc -bits 64 -instname SRAMdpw64d256 -retention on -libertyviewstyle nldm -write_mask off -left_bus_delim "[" -right_bus_delim "]" -pwr_gnd_rename vddpe:VDDPE,vddce:VDDCE,vsse:VSSE -rows_p_bl 256 -wp_size 1 -libname USERLIB -write_thru off -cust_comment "" -prefix "" -mux 4 -top_layer m5-m10 -back_biasing off -ema on -corners ss_0p99v_0p99v_0c,ss_0p99v_0p99v_125c,ss_0p99v_0p99v_m40c
+INFO: Canceled!
+INFO: ascii generator failed
+
+Created spec file: SRAMdpw64d256.spec

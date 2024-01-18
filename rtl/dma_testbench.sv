@@ -82,7 +82,7 @@ Multiplexer u_multiplexer (
 
 // 时钟生成
 always begin
-  #1 clk = ~clk;
+  #10 clk = ~clk;
 end
 
 task automatic dma_transfer;

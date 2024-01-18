@@ -17,3 +17,7 @@
 ./rtl/dma_func_wrapper.sv
 ./rtl/tb_multiplexer.sv
 ./rtl/dma_testbench.sv
+
+./rtl/ram/SRAMdpw64d256.v
+./rtl/DW_fifoctl_s1_sf.v
+./rtl/commonclkBRAMfifo_to_asicfifo_wrapper.v

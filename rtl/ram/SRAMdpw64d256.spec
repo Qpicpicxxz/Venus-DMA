@@ -1,0 +1,34 @@
+# user spec file, compiler sram_dp_hde_rvt_rvt, version r1p1
+
+activity_factor = 50
+back_biasing = off
+bits = 64
+bmux = on
+bus_notation = on
+check_instname = on
+corners = ss_0p99v_0p99v_0c,ss_0p99v_0p99v_125c,ss_0p99v_0p99v_m40c
+cust_comment = 
+diodes = on
+drive = 6
+ema = on
+frequency = 1.0
+instname = SRAMdpw64d256
+left_bus_delim = [
+libertyviewstyle = nldm
+libname = USERLIB
+mux = 4
+mvt = 
+name_case = upper
+power_type = otc
+prefix = 
+pwr_gnd_rename = vddpe:VDDPE,vddce:VDDCE,vsse:VSSE
+retention = on
+right_bus_delim = ]
+rows_p_bl = 256
+ser = none
+site_def = off
+top_layer = m5-m10
+words = 256
+wp_size = 1
+write_mask = off
+write_thru = off
