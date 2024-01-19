@@ -66,6 +66,9 @@ module dma_axi_if
   axi_len_t     beat_counter_ff, next_beat_count;
   /* 寄存写事物传输状态[如果slave的awready消失了] */
   logic         aw_txn_started_ff, next_aw_txn;
+  /* fifo是同步取数的 */
+  logic         fifo_r_hpn_ff, next_fifo_r_hpn;
+  logic         fifo_r_end;
 
 
   // 掩码[63:0] apply to 数据[511:0] ｜ mask[0] = 1 -> data[7:0] is valid
@@ -211,6 +214,7 @@ module dma_axi_if
     // 负责捕捉错误信号
     rd_err_hpn        = 1'b0;
     wr_err_hpn        = 1'b0;
+    fifo_r_end        = 1'b0;
     axi_req_o         = axi_req_t'('0);         // 给AXI总线的信号
     dma_fifo_req_o    = s_dma_fifo_req_t'('0);  // 给数据缓存FIFO的信号 [wr | rd | wr_data]
     dma_axi_rd_resp_o = s_dma_axi_resp_t'('0);  // ready信号是去告诉valid源可以拉低了[已经握手成功]
@@ -258,13 +262,18 @@ module dma_axi_if
         axi_req_o.aw.awburst     = 2'b01;  // INCR传输
         next_aw_txn              = ~axi_resp_i.awready; // 让valid保持住
       end
-      // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
-      if(~dma_fifo_resp_i.empty) begin
-        dma_fifo_req_o.rd = axi_resp_i.wready;
+      if (fifo_r_hpn_ff) begin
+        fifo_r_end = (beat_counter_ff == wr_txn_req_ff.awlen);
         axi_req_o.w.wdata = apply_wr_strb(dma_fifo_resp_i.data_rd, wr_txn_req_ff.wstrb);
         axi_req_o.w.wstrb = wr_txn_req_ff.wstrb;
-        axi_req_o.w.wlast = (beat_counter_ff == wr_txn_req_ff.awlen);
+        axi_req_o.w.wlast = fifo_r_end;
         axi_req_o.wvalid  = 1'b1;
+      end
+      // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
+      if(~dma_fifo_resp_i.empty) begin
+        // dma_fifo
+        dma_fifo_req_o.rd = axi_resp_i.wready && (~fifo_r_end);
+        next_fifo_r_hpn   = axi_resp_i.wready && (~fifo_r_end);
       end
       axi_req_o.bready = 1'b1;
       if (axi_resp_i.bvalid) begin
@@ -284,6 +293,7 @@ module dma_axi_if
       dma_error_ff      <= s_dma_error_t'('0);
       beat_counter_ff   <= '0;
       aw_txn_started_ff <= 1'b0;
+      fifo_r_hpn_ff     <= 'b0;
     end
     else begin
       rd_counter_ff     <= next_rd_counter;
@@ -294,6 +304,7 @@ module dma_axi_if
       dma_error_ff      <= next_dma_error;
       beat_counter_ff   <= next_beat_count;
       aw_txn_started_ff <= next_aw_txn;
+      fifo_r_hpn_ff     <= next_fifo_r_hpn;
     end
   end
 
