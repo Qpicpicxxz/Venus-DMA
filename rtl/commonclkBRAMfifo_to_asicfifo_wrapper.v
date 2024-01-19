@@ -465,7 +465,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[63:0]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;
@@ -500,7 +500,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[127:64]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;
@@ -535,7 +535,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[191:128]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;
@@ -570,7 +570,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[255:192]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;
@@ -605,7 +605,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[319:256]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;
@@ -640,7 +640,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[383:320]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;
@@ -675,7 +675,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[447:384]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;
@@ -710,7 +710,7 @@ generate
                                 .AA(addra), //  input [7:0] AA;
                                 .DA(din[511:448]), //  input [3:0] DA;
                                 .CLKB(clk), //  input  CLKB;
-                                .CENB(1'd0), //  input  CENB;
+                                .CENB(addra==addrb), //  input  CENB;
                                 .WENB(1'd1), //  input WENB;
                                 .AB(addrb), //  input [7:0] AB;
                                 .DB({64{1'd0}}), //  input [3:0] DB;

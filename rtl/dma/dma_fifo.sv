@@ -28,7 +28,7 @@ commonclkBRAMfifo_to_asicfifo_wrapper
     .DEPTH        (SLOTS),
     .OUTPUT_DELAY (1),
     .MANUAL_CONFIG("SRAMdpw512d256")
-)(
+)u_sram_w512d256_fifo(
     .clk(clk),
     .srst(~rstn),
     .din(data_i),
@@ -36,7 +36,13 @@ commonclkBRAMfifo_to_asicfifo_wrapper
     .rd_en(read_i),
     .dout(data_o),
     .full(full_o),
-    .empty(empty_o)
+    .empty(empty_o),
+    
+    .data_count(),
+    
+    .almost_full(),
+    .almost_empty(),
+    .half_full()
     // .dout(new_data_o),
     // .full(new_full_o),
     // .empty(new_empty_o)
