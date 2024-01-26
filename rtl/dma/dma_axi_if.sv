@@ -283,7 +283,7 @@ module dma_axi_if
     end
   end : axi4_master
 
-  always_ff @ (posedge clk) begin
+  always_ff @ (posedge clk or negedge rstn) begin
     if (~rstn) begin
       rd_counter_ff     <= 'b0;
       wr_counter_ff     <= 'b0;

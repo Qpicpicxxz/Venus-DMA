@@ -100,9 +100,13 @@ module dma_func_wrapper
     .dma_stream_err_o       (dma_stream_wr_err)
   );
 
-  dma_fifo u_dma_fifo(
+  fifo_model #(
+    .OUTPUT_DELAY(1),
+    .SLOTS(`DMA_FIFO_DEPTH),
+    .WIDTH(`DMA_DATA_WIDTH)
+  ) u_dma_fifo(
     .clk              (clk),
-    .rstn              (rstn),
+    .rstn             (rstn),
     .clear_i          (clear_dma),
     .write_i          (dma_fifo_req.wr),
     .read_i           (dma_fifo_req.rd),

@@ -161,7 +161,7 @@ module dma_fsm
     dma_stats_o.error = dma_err_hpn;
   end : dma_err_handler
 
-  always_ff @ (posedge clk) begin
+  always_ff @ (posedge clk or negedge rstn) begin
     if (~rstn) begin
       cur_st_ff       <= dma_st_t'('0);
       rd_desc_done_ff <= '0;

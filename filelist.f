@@ -2,7 +2,7 @@
 ./rtl/inc/dma_pkg.sv
 
 ./rtl/dma/dma_axi_if.sv
-./rtl/dma/dma_fifo.sv
+./rtl/dma/fifo_model.sv
 ./rtl/dma/dma_fsm.sv
 ./rtl/dma/dma_streamer.sv
 

@@ -266,7 +266,7 @@ module dma_streamer
     dma_stream_done_o = ((cur_st_ff == DMA_ST_SM_RUN) && (next_st == DMA_ST_SM_IDLE));
   end : burst_calc
 
-  always_ff @ (posedge clk) begin
+  always_ff @ (posedge clk or negedge rstn) begin
     if (~rstn) begin
       cur_st_ff     <= dma_sm_t'('0);
       desc_addr_ff  <= axi_addr_t'('0);
