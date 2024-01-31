@@ -34,9 +34,9 @@ module fifo_model
 //     .dout(data_o),
 //     .full(full_o),
 //     .empty(empty_o),
-    
+
 //     .data_count(),
-    
+
 //     .almost_full(),
 //     .almost_empty(),
 //     .half_full()

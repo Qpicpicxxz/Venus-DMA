@@ -10,6 +10,15 @@ import venus_soc_pkg::*;
 `define DMA_MAX_BEAT_BURST    256 // 1 up to 256
 `define DMA_MAX_BURST_EN      1
 
+`define VENUSDMA_CTRLREG_OFFSET   32'h2004_0000
+`define VENUSDMA_CFGREG_OFFSET    6'h0
+`define VENUSDMA_SRCREG_OFFSET    6'h8
+`define VENUSDMA_DSTREG_OFFSET    6'h10
+`define VENUSDMA_LENREG_OFFSET    6'h18
+`define VENUSDMA_STATREG_OFFSET   6'h20
+`define VENUSDMA_ERRORADDR_OFFSET 6'h28
+`define VENUSDMA_ERRORSRC_OFFSET  6'h30
+
 // DMA_FIFO_DEPTH = 16 | FIFO_WIDTH = 4
 localparam FIFO_WIDTH = $clog2(`DMA_FIFO_DEPTH>1?`DMA_FIFO_DEPTH:2);
 typedef logic [31:0]                        desc_addr_t;
@@ -96,5 +105,21 @@ typedef struct packed {
   axi_len_t    awlen;
   axi_strb_t   wstrb;
 } s_wr_req_t;
+
+typedef struct packed {
+  logic csr_wr_en;
+  // 不传递wstrb意味着：每次都会写整个[31:0]的范围！！！
+  // logic [3:0] csr_wstrb;
+  logic [31:0] csr_waddr;
+  logic [31:0] csr_wdata;
+  logic csr_rd_en;
+  // 目前csr的范围没有超过64byte，所以默认只要读的是VENUSDMA_CTRLREG_OFFSET~VENUSDMA_CTRLREG_OFFSET+0x40范围的地方，都会统一返回相应数据
+  // logic csr_raddr;
+} csr_req_t;
+
+typedef struct packed {
+  // 读64byte的数据(所有的csr范围)
+  logic [511:0] csr_rdata;
+} csr_resp_t;
 
 endpackage

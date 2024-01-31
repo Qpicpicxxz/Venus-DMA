@@ -1,0 +1,127 @@
+module dma_axi_wrapper
+  import venus_soc_pkg::*;
+  import dma_pkg::*;
+(
+  input                  clk,
+  input                  rstn,
+  // CSR DMA I/F
+  input   axi2mem_req_t  axi2mem_req_i,
+  output  axi2mem_resp_t axi2mem_resp_o,
+  // Master DMA I/F
+  output  axi_req_t      axi_req_o,
+  input   axi_resp_t     axi_resp_i,
+  // Triggers - IRQs
+  output  logic          dma_done_o,
+  output  logic          dma_error_o
+);
+
+  logic                    dma_go;
+  s_dma_desc_t             dma_desc;
+  s_dma_status_t           dma_stats;
+  s_dma_error_t            dma_error;
+
+  csr_req_t                dma_csr_req;
+  csr_resp_t               dma_csr_resp;
+
+  logic                    dma_csr_rd_en;
+
+  assign dma_done_o   = dma_stats.done;
+  assign dma_error_o  = dma_stats.error;
+
+
+  // 这里控制查看memory access是否在访问DMA的寄存器
+  assign dma_csr_req.csr_wr_en = axi2mem_req_i.mem_wr_en && ({axi2mem_req_i.mem_waddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
+  assign dma_csr_req.csr_waddr = axiwaddr_512to32_converter(axi2mem_req_i.mem_waddr, axi2mem_req_i.mem_wstrb);
+  assign dma_csr_req.csr_wdata = axiwdata_512to32_converter(axi2mem_req_i.mem_wstrb, axi2mem_req_i.mem_wdata);
+  assign dma_csr_req.csr_rd_en = axi2mem_req_i.mem_rd_en && ({axi2mem_req_i.mem_raddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
+
+  always_ff @(posedge clk or negedge rstn) begin
+    if (!rstn) begin
+      dma_csr_rd_en <= 1'b0;
+    end else begin
+      dma_csr_rd_en <= dma_csr_req.csr_rd_en;
+    end
+  end
+
+  assign axi2mem_resp_o.mem_rdata = dma_csr_rd_en ? dma_csr_resp.csr_rdata : 512'h0;
+
+  dma_func_wrapper u_dma_func (
+    .clk              (clk),
+    .rstn             (rstn),
+    // From/To CSRs
+    .dma_go_i         (dma_go),
+    .dma_desc_i       (dma_desc),
+    .dma_stats_o      (dma_stats),
+    .dma_error_o      (dma_error),
+    // Master AXI I/F
+    .axi_req_o        (axi_req_o),
+    .axi_resp_i       (axi_resp_i)
+  );
+
+  dma_ctrls u_dma_csr (
+    .clk                (clk),
+    .rstn               (rstn),
+    // CSR AXI I/F
+    .dma_csr_req_i      (dma_csr_req),
+    .dma_csr_resp_o     (dma_csr_resp),
+    // CSR DMA I/F
+    .dma_ctrl_go_o      (dma_go),
+    .dma_ctrl_last_o    (),
+    .dma_desc_src_o     (dma_desc.src_addr),
+    .dma_desc_dst_o     (dma_desc.dst_addr),
+    .dma_desc_len_o     (dma_desc.num_bytes),
+    .dma_status_done_i  (dma_stats.done),
+    .dma_status_error_i (dma_stats.error),
+    .dma_error_addr_i   (dma_error.addr),
+    .dma_error_src_i    (dma_error.src)
+  );
+
+  function logic [31:0] axiwaddr_512to32_converter(input logic [31:0] addr, input logic [63:0] strb); //dma write to registers
+    begin
+      priority case(1)
+        strb[ 3: 0] != 4'd0 : return addr;
+        strb[ 7: 4] != 4'd0 : return addr + 32'd4;
+        strb[11: 8] != 4'd0 : return addr + 32'd8;
+        strb[15:12] != 4'd0 : return addr + 32'd12;
+        strb[19:16] != 4'd0 : return addr + 32'd16;
+        strb[23:20] != 4'd0 : return addr + 32'd20;
+        strb[27:24] != 4'd0 : return addr + 32'd24;
+        strb[31:28] != 4'd0 : return addr + 32'd28;
+        strb[35:32] != 4'd0 : return addr + 32'd32;
+        strb[39:36] != 4'd0 : return addr + 32'd36;
+        strb[43:40] != 4'd0 : return addr + 32'd40;
+        strb[47:44] != 4'd0 : return addr + 32'd44;
+        strb[51:48] != 4'd0 : return addr + 32'd48;
+        strb[55:52] != 4'd0 : return addr + 32'd52;
+        strb[59:56] != 4'd0 : return addr + 32'd56;
+        strb[63:60] != 4'd0 : return addr + 32'd60;
+        default : return 32'd0;
+      endcase
+    end
+  endfunction
+
+  function logic [31:0] axiwdata_512to32_converter(input logic [63:0] strb, input logic [511:0] data); //dma write to registers
+    begin
+      priority case(1)
+        strb[ 3: 0] != 4'd0 : return data[ 0*32+31: 0*32];
+        strb[ 7: 4] != 4'd0 : return data[ 1*32+31: 1*32];
+        strb[11: 8] != 4'd0 : return data[ 2*32+31: 2*32];
+        strb[15:12] != 4'd0 : return data[ 3*32+31: 3*32];
+        strb[19:16] != 4'd0 : return data[ 4*32+31: 4*32];
+        strb[23:20] != 4'd0 : return data[ 5*32+31: 5*32];
+        strb[27:24] != 4'd0 : return data[ 6*32+31: 6*32];
+        strb[31:28] != 4'd0 : return data[ 7*32+31: 7*32];
+        strb[35:32] != 4'd0 : return data[ 8*32+31: 8*32];
+        strb[39:36] != 4'd0 : return data[ 9*32+31: 9*32];
+        strb[43:40] != 4'd0 : return data[10*32+31:10*32];
+        strb[47:44] != 4'd0 : return data[11*32+31:11*32];
+        strb[51:48] != 4'd0 : return data[12*32+31:12*32];
+        strb[55:52] != 4'd0 : return data[13*32+31:13*32];
+        strb[59:56] != 4'd0 : return data[14*32+31:14*32];
+        strb[63:60] != 4'd0 : return data[15*32+31:15*32];
+        default : return 32'd0;
+      endcase
+    end
+  endfunction
+
+endmodule

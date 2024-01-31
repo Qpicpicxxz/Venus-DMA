@@ -11,34 +11,47 @@ parameter TRANSFER_DST     = 32'h1400_0100;
 import venus_soc_pkg::*;
 import dma_pkg::*;
 
-logic clk;
-logic reset_n_mem;
-logic reset_n;
+logic          clk;
+logic          reset_n_mem;
+logic          reset_n;
 
-logic            dma_go_i;
-s_dma_desc_t     dma_desc;
-s_dma_error_t    dma_error;
-s_dma_status_t   dma_stats;
+axi2mem_req_t  mem_req;
+axi2mem_resp_t mem_resp;
+logic          dma_done;
+logic          dma_error;
 
-logic            master_ctrl;
-axi_req_t        axi_req_o_dma;
-axi_req_t        axi_req_o_bfm;
-axi_req_t        axi_req_o;
-axi_resp_t       axi_resp_i_dma;
-axi_resp_t       axi_resp_i_bfm;
-axi_resp_t       axi_resp_i;
+logic          master_ctrl;
+axi_req_t      axi_req_o_dma;
+axi_req_t      axi_req_o_bfm;
+axi_req_t      axi_req_o;
+axi_resp_t     axi_resp_i_dma;
+axi_resp_t     axi_resp_i_bfm;
+axi_resp_t     axi_resp_i;
 
-dma_func_wrapper u_dma (
-  .clk              (clk           ),
-  .rstn             (reset_n       ),
-  // From/To CSRs
-  .dma_go_i         (dma_go_i      ),
-  .dma_desc_i       (dma_desc      ),
-  .dma_stats_o      (dma_stats     ),
-  .dma_error_o      (dma_error     ),
+dma_axi_wrapper u_dma (
+  .clk (clk),
+  .rstn (reset_n),
+  // CSR DMA I/F
+  .axi2mem_req_i  (mem_req),
+  .axi2mem_resp_o (mem_resp),
   // Master AXI I/F
-  .axi_req_o        (axi_req_o_dma ),
-  .axi_resp_i       (axi_resp_i_dma)
+  .axi_req_o      (axi_req_o_dma ),
+  .axi_resp_i     (axi_resp_i_dma),
+  // Triggers IRQs
+  .dma_done_o     (dma_done),
+  .dma_error_o    (dma_error)
+);
+
+cdn_cpu_master_bfm_wrapper#(
+  .NAME({"CPU_0"}),
+  .DATA_BUS_WIDTH(DATA_BUS_WIDTH),
+  .ADDRESS_BUS_WIDTH(32),
+  .ID_BUS_WIDTH(ID_BUS_WIDTH)
+) u_cpu_bfm (
+  .clk (clk),
+  .rstn (reset_n),
+  .axi2mem_req_o (mem_req),
+  .axi2mem_resp_i (mem_resp)
 );
 
 cdn_axi4_master_bfm_wrapper#(
@@ -85,45 +98,6 @@ always begin
   #10 clk = ~clk;
 end
 
-task automatic dma_transfer;
-  input [31:0] src;
-  input [31:0] dst;
-  input [31:0] bytes;
-  dma_desc.src_addr  = src;
-  dma_desc.dst_addr  = dst;
-  dma_desc.num_bytes = bytes;
-  dma_go_i           = 1'b1;
-  while(!dma_stats.active) @(posedge clk);
-  dma_go_i           = 1'b0;
-  while(!dma_stats.done && dma_stats.active) @(posedge clk) begin
-    if(dma_stats.error == 1) begin
-      $display("[%0t]: DMA error is %d", $time, dma_error.src);
-    end
-  end
-endtask
-
-task automatic ram_init;
-  for (int i = 0; i < 16384; i++)begin
-    data64.randomize();
-    ddr_model[(RAM_START_ADDR+(32'h40 * i))] = data64.data;
-    u_axi4_master_bfm.BFM_WRITE_BURST64(RAM_START_ADDR, (32'h40 * i), data64.data, `ENABLE_MESSAGE);
-  end
-endtask
-
-task automatic transfer_test;
-input int repeat_num;
-input int byte_num;
-int num = byte_num / 64;
-  repeat(repeat_num) begin
-    desc.randomize();
-    $display("[%0t] testing %d-bytes transfer, src = %h, dst = %h", $time, byte_num, desc.src, desc.dst);
-    for (int i = 0; i < num; i++) begin
-      ddr_model[desc.dst + (32'h40 * i)]=ddr_model[desc.src + (32'h40 * i)];
-    end
-    dma_transfer(desc.src, desc.dst, (32'h40 * num));
-  end
-endtask
-
 // 测试激励
 initial begin
   $display("[%0t]: Reseting all module...", $time);
@@ -136,27 +110,25 @@ initial begin
   reset_n_mem = 1'b1;
   reset_n     = 1'b1;
 
-	desc        = new();
-  data64      = new();
-  master_ctrl = 1'b0;
-  ram_init();
-  master_ctrl = 1'b1;
-  transfer_test(5,256);  // (repeat num, transfer bytes)
-  transfer_test(5,512);
-  transfer_test(50,1024);
-  transfer_test(5,2048);
-  transfer_test(5,4096);
-  transfer_test(5,8192);
+  master_ctrl = 1'b0; // change to BFM
+  $display("[%0t]: Start initializing memory..", $time);
+  u_axi4_master_bfm.BFM_WRITE_BURST64(32'h1100_0100,32'h0000_0000,TESTDATA512bits_1,`ENABLE_MESSAGE);
+  master_ctrl = 1'b1; // change to DMA
 
-  master_ctrl = 1'b0;
-  foreach(ddr_model[j])begin
-     u_axi4_master_bfm.BFM_READ_BURST64(j, 0, response512, `ENABLE_MESSAGE);
-     if((response512 != ddr_model[j]) || (response512 === 'dx)) begin
-         $display("DMA error at %0h, write data is:%0h, read data is:%0h.",j ,ddr_model[j], response512);
-         $stop;
-     end
+  $display("[%0t]: Start writing DMA control registers...", $time);
+  u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_SRCREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h1100_0100,`ENABLE_MESSAGE);
+  u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_DSTREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h1400_0100,`ENABLE_MESSAGE);
+  u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_LENREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h0000_0040,`ENABLE_MESSAGE);  // 64byte
+  u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_CFGREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h0000_0001,`ENABLE_MESSAGE);
+  repeat(50) @(posedge clk) begin
+    if (dma_done) begin
+      $display("[%0t]: DMA transmit done...", $time);
+      break;
+    end
   end
-  $display("DMA test done!");
+  u_cpu_bfm.CPU_READ_BURST64(32'h0000_0000,`VENUSDMA_CTRLREG_OFFSET,response512,`ENABLE_MESSAGE);
+  master_ctrl = 1'b0; // change to BFM
+  u_axi4_master_bfm.BFM_READ_BURST64(32'h1400_0100,32'h0,response512,`ENABLE_MESSAGE);
   $stop;
 end
 

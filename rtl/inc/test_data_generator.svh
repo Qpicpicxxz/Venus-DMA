@@ -183,7 +183,6 @@ parameter TESTDATA16384bits_2 =    {256'hbdaf_6870_7fdd_f388_9f37_d5a3_4f27_1c55
                                     256'h3a9f_64e7_399a_6a04_8bcb_9852_af03_6a77_ff3a_92a5_e600_4c64_dcaa_fed1_7311_0be8,
                                     256'hb8cf_2714_9a4b_eb47_cbd0_6eb9_b88d_60a6_9598_9cf3_2c54_81da_f45c_550d_def8_e837};
 
-
 parameter TESTDATA16384bits_3 =    {256'h6197_dd32_7fb1_076d_e6c4_ca54_4a2b_9341_2d11_96c3_e3d8_0765_9d20_379c_7af8_f856,
                                     256'hd0f3_5a43_074f_681b_8eda_6c41_4a56_9c54_1219_69dd_106e_cf8a_7583_070e_8b99_35cb,
                                     256'h0ffa_e652_8452_4ad7_1fb1_3646_993b_3a6e_7f51_5554_8950_e665_96b9_d367_dafd_1a70,
@@ -336,5 +335,73 @@ class test_dma_desc_normal;
   }
 endclass
 test_dma_desc_normal desc;
+
+// logic            dma_go_i;
+// s_dma_desc_t     dma_desc;
+// s_dma_error_t    dma_error;
+// s_dma_status_t   dma_stats;
+
+// task automatic dma_transfer;
+//   input [31:0] src;
+//   input [31:0] dst;
+//   input [31:0] bytes;
+//   dma_desc.src_addr  = src;
+//   dma_desc.dst_addr  = dst;
+//   dma_desc.num_bytes = bytes;
+//   dma_go_i           = 1'b1;
+//   while(!dma_stats.active) @(posedge clk);
+//   dma_go_i           = 1'b0;
+//   while(!dma_stats.done && dma_stats.active) @(posedge clk) begin
+//     if(dma_stats.error == 1) begin
+//       $display("[%0t]: DMA error is %d", $time, dma_error.src);
+//     end
+//   end
+// endtask
+
+// task automatic ram_init;
+//   for (int i = 0; i < 16384; i++)begin
+//     data64.randomize();
+//     ddr_model[(RAM_START_ADDR+(32'h40 * i))] = data64.data;
+//     u_axi4_master_bfm.BFM_WRITE_BURST64(RAM_START_ADDR, (32'h40 * i), data64.data, `ENABLE_MESSAGE);
+//   end
+// endtask
+
+// task automatic transfer_test;
+//   input int repeat_num;
+//   input int byte_num;
+//   int num = byte_num / 64;
+//     repeat(repeat_num) begin
+//       desc.randomize();
+//       $display("[%0t] testing %d-bytes transfer, src = %h, dst = %h", $time, byte_num, desc.src, desc.dst);
+//       for (int i = 0; i < num; i++) begin
+//         ddr_model[desc.dst + (32'h40 * i)]=ddr_model[desc.src + (32'h40 * i)];
+//       end
+//       dma_transfer(desc.src, desc.dst, (32'h40 * num));
+//     end
+// endtask
+
+// task automatic dma_random_test;
+// 	desc        = new();
+//   data64      = new();
+//   master_ctrl = 1'b0;    // change to BFM
+//   ram_init();
+//   master_ctrl = 1'b1;    // change to DMA
+//   transfer_test(5,256);  // (repeat num, transfer bytes)
+//   transfer_test(5,512);
+//   transfer_test(50,1024);
+//   transfer_test(5,2048);
+//   transfer_test(5,4096);
+//   transfer_test(5,8192);
+//   master_ctrl = 1'b0;    // change to BFM
+//   foreach(ddr_model[j])begin
+//      u_axi4_master_bfm.BFM_READ_BURST64(j, 0, response512, `ENABLE_MESSAGE);
+//      if((response512 != ddr_model[j]) || (response512 === 'dx)) begin
+//          $display("DMA error at %0h, write data is:%0h, read data is:%0h.",j ,ddr_model[j], response512);
+//          $stop;
+//      end
+//   end
+//   $display("DMA test done!");
+//   $stop;
+// endtask
 
 `endif
