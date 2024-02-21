@@ -15,19 +15,42 @@ module dma_axi_wrapper
   output  logic          dma_error_o
 );
 
-  logic                    dma_go;
-  s_dma_desc_t             dma_desc;
-  s_dma_status_t           dma_stats;
-  s_dma_error_t            dma_error;
+  s_dma_desc_t      dma_csr2fifo_desc;   // csr out, fifo in
+  logic             dma_csr2fifo_write;  // csr out, fifo in
+  logic             dma_csr2fifo_last;   // csr out, fifo in
 
-  csr_req_t                dma_csr_req;
-  csr_resp_t               dma_csr_resp;
+  s_dma_desc_t      dma_fifo2func_desc;  // fifo out, func in
+  logic             dma_trans_last;      // fifo out
 
-  logic                    dma_csr_rd_en;
+  logic             dma_fifo_read;  // fifo in
+  logic             dma_fifo_full;  // fifo out
+  logic             dma_fifo_empty; // fifo out
 
-  assign dma_done_o   = dma_stats.done;
+  logic             dma_go;     // func in
+  s_dma_status_t    dma_stats;  // func out
+  s_dma_error_t     dma_error;  // func out
+
+  csr_req_t         dma_csr_req;  // csr in
+  csr_resp_t        dma_csr_resp; // csr out
+  logic             dma_csr_rd_en;
+
+  logic last_dma_active;  // stores the previous value of dma_active
+  logic next_dma_fifo_read_hpn, dma_fifo_read_hpn_ff;
+  logic dma_trans_last_ff;
+
+  assign dma_fifo_read = ~(dma_stats.active | last_dma_active | dma_fifo_empty);
+  assign dma_go        = ~(dma_stats.active | last_dma_active | dma_fifo_empty);
+
+  always_comb begin
+    next_dma_fifo_read_hpn = dma_fifo_read;
+    // fifo读取延迟一拍: 读出当前dma请求是否是最后一个请求块
+    if (dma_fifo_read_hpn_ff) begin
+      dma_trans_last_ff = dma_trans_last;
+    end
+  end
+
+  assign dma_done_o   = dma_stats.done & dma_trans_last_ff;
   assign dma_error_o  = dma_stats.error;
-
 
   // 这里控制查看memory access是否在访问DMA的寄存器
   assign dma_csr_req.csr_wr_en = axi2mem_req_i.mem_wr_en && ({axi2mem_req_i.mem_waddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
@@ -35,22 +58,25 @@ module dma_axi_wrapper
   assign dma_csr_req.csr_wdata = axiwdata_512to32_converter(axi2mem_req_i.mem_wstrb, axi2mem_req_i.mem_wdata);
   assign dma_csr_req.csr_rd_en = axi2mem_req_i.mem_rd_en && ({axi2mem_req_i.mem_raddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
 
+  assign axi2mem_resp_o.mem_rdata = dma_csr_rd_en ? dma_csr_resp.csr_rdata : 512'h0;
+
   always_ff @(posedge clk or negedge rstn) begin
     if (!rstn) begin
-      dma_csr_rd_en <= 1'b0;
+      dma_csr_rd_en        <= 1'b0;
+      last_dma_active      <= 1'b0;
+      dma_fifo_read_hpn_ff <= 1'b0;
     end else begin
-      dma_csr_rd_en <= dma_csr_req.csr_rd_en;
+      dma_csr_rd_en        <= dma_csr_req.csr_rd_en;
+      last_dma_active      <= dma_stats.active;
+      dma_fifo_read_hpn_ff <= next_dma_fifo_read_hpn;
     end
   end
-
-  assign axi2mem_resp_o.mem_rdata = dma_csr_rd_en ? dma_csr_resp.csr_rdata : 512'h0;
 
   dma_func_wrapper u_dma_func (
     .clk              (clk),
     .rstn             (rstn),
-    // From/To CSRs
     .dma_go_i         (dma_go),
-    .dma_desc_i       (dma_desc),
+    .dma_desc_i       (dma_fifo2func_desc),
     .dma_stats_o      (dma_stats),
     .dma_error_o      (dma_error),
     // Master AXI I/F
@@ -58,22 +84,36 @@ module dma_axi_wrapper
     .axi_resp_i       (axi_resp_i)
   );
 
+  dma_csr_fifo u_dma_fifo (
+    .clk              (clk),
+    .rstn             (rstn),
+    .dma_fifo_write_i (dma_csr2fifo_write),
+    .dma_fifo_read_i  (dma_fifo_read),
+    .dma_fifo_last_i  (dma_csr2fifo_last),
+    .dma_fifo_desc_i  (dma_csr2fifo_desc),
+    .dma_fifo_desc_o  (dma_fifo2func_desc),
+    .dma_fifo_last_o  (dma_trans_last),
+    .dma_fifo_full_o  (dma_fifo_full),
+    .dma_fifo_empty_o (dma_fifo_empty)
+  );
+
   dma_ctrls u_dma_csr (
-    .clk                (clk),
-    .rstn               (rstn),
+    .clk                  (clk),
+    .rstn                 (rstn),
     // CSR AXI I/F
-    .dma_csr_req_i      (dma_csr_req),
-    .dma_csr_resp_o     (dma_csr_resp),
+    .dma_csr_req_i        (dma_csr_req),
+    .dma_csr_resp_o       (dma_csr_resp),
     // CSR DMA I/F
-    .dma_ctrl_go_o      (dma_go),
-    .dma_ctrl_last_o    (),
-    .dma_desc_src_o     (dma_desc.src_addr),
-    .dma_desc_dst_o     (dma_desc.dst_addr),
-    .dma_desc_len_o     (dma_desc.num_bytes),
-    .dma_status_done_i  (dma_stats.done),
-    .dma_status_error_i (dma_stats.error),
-    .dma_error_addr_i   (dma_error.addr),
-    .dma_error_src_i    (dma_error.src)
+    .dma_ctrl_write_o     (dma_csr2fifo_write),
+    .dma_ctrl_last_o      (dma_csr2fifo_last),
+    .dma_desc_src_o       (dma_csr2fifo_desc.src_addr),
+    .dma_desc_dst_o       (dma_csr2fifo_desc.dst_addr),
+    .dma_desc_len_o       (dma_csr2fifo_desc.num_bytes),
+    // .dma_status_done_i    (dma_stats.done),
+    .dma_status_error_i   (dma_stats.error),
+    .dma_csr_fifo_full_i  (dma_fifo_full),
+    .dma_error_addr_i     (dma_error.addr),
+    .dma_error_src_i      (dma_error.src)
   );
 
   function logic [31:0] axiwaddr_512to32_converter(input logic [31:0] addr, input logic [63:0] strb); //dma write to registers
