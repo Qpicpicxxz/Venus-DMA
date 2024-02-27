@@ -16,8 +16,8 @@
  * |    ERRORADDR  |  0x28  |
  * +---------------+--------+
  *
- * CFGREG[0]: 启动DMA，产生dma_ctrl_write_o信号(后续应该改为让fifo推入一次传输块信息的信号)
- * CFGREG[1]: 告诉DMA这是此次散列传输的最后一个块，让DMA在传输完成这个块之后拉高L1 sheduler的中断(先不管)
+ * CFGREG[0]: 启动DMA，产生dma_ctrl_write_o信号
+ * CFGREG[1]: 告诉DMA这是此次散列传输的最后一个块，让DMA在传输完成这个块之后拉高L1 sheduler的中断
  *
  * STATREG[0]: 查看DMA拉高中断的原因: 0b0 - 正常散列传输完毕 ｜ 0b1 - 发生异常报错
  * STATREG[1]: 指示当前DMA的csr fifo是否满

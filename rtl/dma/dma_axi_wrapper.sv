@@ -5,8 +5,8 @@ module dma_axi_wrapper
   input                  clk,
   input                  rstn,
   // CSR DMA I/F
-  input   axi2mem_req_t  axi2mem_req_i,
-  output  axi2mem_resp_t axi2mem_resp_o,
+  input   axi_req_t      axi_req_i,
+  output  axi_resp_t     axi_resp_o,
   // Master DMA I/F
   output  axi_req_t      axi_req_o,
   input   axi_resp_t     axi_resp_i,
@@ -14,6 +14,23 @@ module dma_axi_wrapper
   output  logic          dma_done_o,
   output  logic          dma_error_o
 );
+
+  axi2mem_req_t  mem_req;
+  axi2mem_resp_t mem_resp;
+
+  axi_ram_if_wrapper #(
+      .DATA_WIDTH(DATA_BUS_WIDTH),
+      .ADDR_WIDTH(32),
+      .ID_WIDTH(ID_BUS_WIDTH),
+      .PIPELINE_OUTPUT(0)
+  ) u_cpu_axi_mem_if_wrapper (
+      .aclk             (clk),
+      .aresetn          (rstn),
+      .axi_req_i        (axi_req_i),
+      .axi_resp_o       (axi_resp_o),
+      .axi2mem_req_o    (mem_req),
+      .axi2mem_resp_i   (mem_resp)
+  );
 
   s_dma_desc_t      dma_csr2fifo_desc;   // csr out, fifo in
   logic             dma_csr2fifo_write;  // csr out, fifo in
@@ -53,12 +70,12 @@ module dma_axi_wrapper
   assign dma_error_o  = dma_stats.error;
 
   // 这里控制查看memory access是否在访问DMA的寄存器
-  assign dma_csr_req.csr_wr_en = axi2mem_req_i.mem_wr_en && ({axi2mem_req_i.mem_waddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
-  assign dma_csr_req.csr_waddr = axiwaddr_512to32_converter(axi2mem_req_i.mem_waddr, axi2mem_req_i.mem_wstrb);
-  assign dma_csr_req.csr_wdata = axiwdata_512to32_converter(axi2mem_req_i.mem_wstrb, axi2mem_req_i.mem_wdata);
-  assign dma_csr_req.csr_rd_en = axi2mem_req_i.mem_rd_en && ({axi2mem_req_i.mem_raddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
+  assign dma_csr_req.csr_wr_en = mem_req.mem_wr_en && ({mem_req.mem_waddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
+  assign dma_csr_req.csr_waddr = axiwaddr_512to32_converter(mem_req.mem_waddr, mem_req.mem_wstrb);
+  assign dma_csr_req.csr_wdata = axiwdata_512to32_converter(mem_req.mem_wstrb, mem_req.mem_wdata);
+  assign dma_csr_req.csr_rd_en = mem_req.mem_rd_en && ({mem_req.mem_raddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
 
-  assign axi2mem_resp_o.mem_rdata = dma_csr_rd_en ? dma_csr_resp.csr_rdata : 512'h0;
+  assign mem_resp.mem_rdata = dma_csr_rd_en ? dma_csr_resp.csr_rdata : 512'h0;
 
   always_ff @(posedge clk or negedge rstn) begin
     if (!rstn) begin
@@ -84,17 +101,26 @@ module dma_axi_wrapper
     .axi_resp_i       (axi_resp_i)
   );
 
-  dma_csr_fifo u_dma_fifo (
-    .clk              (clk),
-    .rstn             (rstn),
-    .dma_fifo_write_i (dma_csr2fifo_write),
-    .dma_fifo_read_i  (dma_fifo_read),
-    .dma_fifo_last_i  (dma_csr2fifo_last),
-    .dma_fifo_desc_i  (dma_csr2fifo_desc),
-    .dma_fifo_desc_o  (dma_fifo2func_desc),
-    .dma_fifo_last_o  (dma_trans_last),
-    .dma_fifo_full_o  (dma_fifo_full),
-    .dma_fifo_empty_o (dma_fifo_empty)
+  logic [96:0] data_i;
+  logic [96:0] data_o;
+  assign data_i             = {dma_csr2fifo_desc,dma_csr2fifo_last};         // 97bit
+  assign dma_fifo2func_desc = data_o[96:1];
+  assign dma_trans_last     = data_o[0];
+
+  fifo_model #(
+    .OUTPUT_DELAY(1),
+    .SLOTS(32),
+    .WIDTH(97)
+  ) u_dma_csr_fifo (
+    .clk        (clk),
+    .rstn       (rstn),
+    .clear_i    (),
+    .write_i    (dma_csr2fifo_write),
+    .read_i     (dma_fifo_read),
+    .data_i     (data_i),
+    .data_o     (data_o),
+    .full_o     (dma_fifo_full),
+    .empty_o    (dma_fifo_empty)
   );
 
   dma_ctrls u_dma_csr (

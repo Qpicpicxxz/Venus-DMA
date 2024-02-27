@@ -6,7 +6,6 @@
 ./rtl/dma/dma_fsm.sv
 ./rtl/dma/dma_streamer.sv
 ./rtl/dma/dma_ctrls.sv
-./rtl/dma/dma_csr_fifo.sv
 ./rtl/dma/dma_func_wrapper.sv
 ./rtl/dma/dma_axi_wrapper.sv
 

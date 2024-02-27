@@ -15,8 +15,6 @@ logic          clk;
 logic          reset_n_mem;
 logic          reset_n;
 
-axi2mem_req_t  mem_req;
-axi2mem_resp_t mem_resp;
 logic          dma_done;
 logic          dma_error;
 
@@ -24,16 +22,18 @@ logic          master_ctrl;
 axi_req_t      axi_req_o_dma;
 axi_req_t      axi_req_o_bfm;
 axi_req_t      axi_req_o;
+axi_req_t      axi_req_csr;
 axi_resp_t     axi_resp_i_dma;
 axi_resp_t     axi_resp_i_bfm;
 axi_resp_t     axi_resp_i;
+axi_resp_t     axi_resp_csr;
 
 dma_axi_wrapper u_dma (
-  .clk (clk),
+  .clk  (clk),
   .rstn (reset_n),
   // CSR DMA I/F
-  .axi2mem_req_i  (mem_req),
-  .axi2mem_resp_o (mem_resp),
+  .axi_req_i      (axi_req_csr),
+  .axi_resp_o     (axi_resp_csr),
   // Master AXI I/F
   .axi_req_o      (axi_req_o_dma ),
   .axi_resp_i     (axi_resp_i_dma),
@@ -48,10 +48,10 @@ cdn_cpu_master_bfm_wrapper#(
   .ADDRESS_BUS_WIDTH(32),
   .ID_BUS_WIDTH(ID_BUS_WIDTH)
 ) u_cpu_bfm (
-  .clk (clk),
-  .rstn (reset_n),
-  .axi2mem_req_o (mem_req),
-  .axi2mem_resp_i (mem_resp)
+  .clk        (clk),
+  .rstn       (reset_n),
+  .axi_req_o  (axi_req_csr),
+  .axi_resp_i (axi_resp_csr)
 );
 
 cdn_axi4_master_bfm_wrapper#(
@@ -140,11 +140,6 @@ initial begin
   // u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_LENREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h0000_0038,`ENABLE_MESSAGE);
   // u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_CFGREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h0000_0001,`ENABLE_MESSAGE); // cross boundary
 
-  // u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_SRCREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h1100_10fc,`ENABLE_MESSAGE);
-  // u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_DSTREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h1400_1100,`ENABLE_MESSAGE);
-  // u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_LENREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h0000_0038,`ENABLE_MESSAGE);
-  // u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_CFGREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h0000_0001,`ENABLE_MESSAGE);
-
   u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_SRCREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h1100_2100,`ENABLE_MESSAGE);
   u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_DSTREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h1400_2100,`ENABLE_MESSAGE);
   u_cpu_bfm.CPU_WRITE_BURST4(`VENUSDMA_LENREG_OFFSET,`VENUSDMA_CTRLREG_OFFSET,32'h0000_0800,`ENABLE_MESSAGE);
@@ -164,9 +159,8 @@ initial begin
     end
   end
 
-      u_cpu_bfm.CPU_READ_BURST64(32'h0000_0000,`VENUSDMA_CTRLREG_OFFSET,response512,`ENABLE_MESSAGE);
+  u_cpu_bfm.CPU_READ_BURST64(32'h0000_0000,`VENUSDMA_CTRLREG_OFFSET,response512,`ENABLE_MESSAGE);
 
-  // u_cpu_bfm.CPU_READ_BURST64(32'h0000_0000,`VENUSDMA_CTRLREG_OFFSET,response512,`ENABLE_MESSAGE);
   master_ctrl = 1'b0; // change to BFM
   u_axi4_master_bfm.BFM_READ_BURST2048(32'h1400_0100,32'h0,response512,`ENABLE_MESSAGE);
   u_axi4_master_bfm.BFM_READ_BURST2048(32'h1400_1100,32'h0,response512,`ENABLE_MESSAGE);
