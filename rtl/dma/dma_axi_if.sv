@@ -215,6 +215,7 @@ module dma_axi_if
     rd_err_hpn        = 1'b0;
     wr_err_hpn        = 1'b0;
     fifo_r_end        = 1'b0;
+    next_fifo_r_hpn   = 1'b0;
     axi_req_o         = axi_req_t'('0);         // 给AXI总线的信号
     dma_fifo_req_o    = s_dma_fifo_req_t'('0);  // 给数据缓存FIFO的信号 [wr | rd | wr_data]
     dma_axi_rd_resp_o = s_dma_axi_resp_t'('0);  // ready信号是去告诉valid源可以拉低了[已经握手成功]

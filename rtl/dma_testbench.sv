@@ -95,6 +95,9 @@ task automatic dma_transfer;
   dma_go_i           = 1'b1;
   while(!dma_stats.active) @(posedge clk);
   dma_go_i           = 1'b0;
+  dma_desc.src_addr  = '0;
+  dma_desc.dst_addr  = '0;
+  dma_desc.num_bytes = '0;
   while(!dma_stats.done && dma_stats.active) @(posedge clk) begin
     if(dma_stats.error == 1) begin
       $display("[%0t]: DMA error is %d", $time, dma_error.src);

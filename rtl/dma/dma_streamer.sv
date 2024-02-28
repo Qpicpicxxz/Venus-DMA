@@ -7,7 +7,7 @@ module dma_streamer
 ) (
   input                                     clk,
   input                                     rstn,
-  // From/To CSRs
+  input   logic                             dma_go_i,
   input   s_dma_desc_t                      dma_desc_i,
   // From/To AXI I/F
   output  s_dma_axi_req_t                   dma_axi_req_o,
@@ -38,6 +38,7 @@ module dma_streamer
   logic             addr_unaligned_err, addr_cross_bound_err;
   logic             err_lock_ff, next_err_lock;
   s_dma_error_t     dma_error_ff, next_dma_error;
+  s_dma_desc_t      dma_desc_ff;
 
   // 检查源地址与目的地址是否4kB越界 ｜ [0 - 越界] [1 - 未越界]
   function automatic logic burst_r4KB(axi_addr_t base, axi_addr_t fut);
@@ -277,6 +278,7 @@ module dma_streamer
       dma_error_ff  <= s_dma_error_t'('0);
     end
     else begin
+      if (dma_go_i) dma_desc_ff <= dma_desc_i;
       cur_st_ff     <= next_st;
       desc_addr_ff  <= next_desc_addr;
       desc_bytes_ff <= next_desc_bytes;

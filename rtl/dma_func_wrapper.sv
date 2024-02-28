@@ -74,6 +74,7 @@ module dma_func_wrapper
   ) u_dma_rd_streamer (
     .clk                    (clk),
     .rstn                   (rstn),
+    .dma_go_i               (dma_go_i),
     .dma_desc_i             (dma_desc_i),
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_rd_req),
@@ -90,6 +91,7 @@ module dma_func_wrapper
   ) u_dma_wr_streamer (
     .clk                    (clk),
     .rstn                   (rstn),
+    .dma_go_i               (dma_go_i),
     .dma_desc_i             (dma_desc_i),
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_wr_req),

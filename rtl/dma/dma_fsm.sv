@@ -86,8 +86,7 @@ module dma_fsm
     dma_active_o          = (cur_st_ff == DMA_ST_RUN);
 
     if (cur_st_ff == DMA_ST_RUN) begin
-      // 如果传输的bytes不为 0 和 `rd_desc_done_ff` = 0
-      if((|dma_desc_i.num_bytes) && (~rd_desc_done_ff)) begin
+      if(~rd_desc_done_ff) begin
         dma_stream_rd_valid_o = 1'b1; // 告诉streamer Read操作valid
       end
 
@@ -112,7 +111,7 @@ module dma_fsm
     pending_wr_desc      = 1'b0;
 
     if (cur_st_ff == DMA_ST_RUN) begin
-      if((|dma_desc_i.num_bytes) && (~wr_desc_done_ff)) begin
+      if(~wr_desc_done_ff) begin
         dma_stream_wr_valid_o = 1'b1;
       end
 
