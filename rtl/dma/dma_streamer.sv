@@ -38,7 +38,9 @@ module dma_streamer
   logic             addr_unaligned_err, addr_cross_bound_err;
   logic             err_lock_ff, next_err_lock;
   s_dma_error_t     dma_error_ff, next_dma_error;
-  s_dma_desc_t      dma_desc_ff;
+  s_dma_desc_t      dma_desc_ff, next_dma_desc;
+
+  assign next_dma_desc = dma_go_i ? dma_desc_i : dma_desc_ff;
 
   // 检查源地址与目的地址是否4kB越界 ｜ [0 - 越界] [1 - 未越界]
   function automatic logic burst_r4KB(axi_addr_t base, axi_addr_t fut);
@@ -193,14 +195,14 @@ module dma_streamer
     // FSM valid进来的那一拍 / dma_go_i的下一拍
     if ((cur_st_ff == DMA_ST_SM_IDLE) && (next_st == DMA_ST_SM_RUN)) begin
       // 如果传输长度 < 64bytes, 则保留原值 ｜ 如果传输长度 >= 64bytes, 则传输长度64byte向上对齐
-      next_desc_bytes = enough_for_burst(dma_desc_i.num_bytes) ? celi_align64_bytes(dma_desc_i.num_bytes) : dma_desc_i.num_bytes;
+      next_desc_bytes = enough_for_burst(dma_desc_ff.num_bytes) ? celi_align64_bytes(dma_desc_ff.num_bytes) : dma_desc_ff.num_bytes;
 
       // 读模块 or 写模块
       if (STREAM_TYPE) begin
-        next_desc_addr = dma_desc_i.dst_addr;
+        next_desc_addr = dma_desc_ff.dst_addr;
       end
       else begin
-        next_desc_addr = dma_desc_i.src_addr;
+        next_desc_addr = dma_desc_ff.src_addr;
       end
     end
 
@@ -276,9 +278,9 @@ module dma_streamer
       dma_req_ff    <= s_dma_axi_req_t'(0);
       err_lock_ff   <= 1'b0;
       dma_error_ff  <= s_dma_error_t'('0);
+      dma_desc_ff   <= s_dma_desc_t'('0);
     end
     else begin
-      if (dma_go_i) dma_desc_ff <= dma_desc_i;
       cur_st_ff     <= next_st;
       desc_addr_ff  <= next_desc_addr;
       desc_bytes_ff <= next_desc_bytes;
@@ -286,6 +288,7 @@ module dma_streamer
       dma_req_ff    <= next_dma_req;
       err_lock_ff   <= next_err_lock;
       dma_error_ff  <= next_dma_error;
+      dma_desc_ff   <= next_dma_desc;
     end
   end
 endmodule
