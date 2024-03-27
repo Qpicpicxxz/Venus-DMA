@@ -1,24 +1,30 @@
 package venus_soc_pkg;
 
 parameter DATA_BUS_WIDTH = 512;
-parameter ID_BUS_WIDTH = 7;  // 可配置「与L2设置齐平」
+parameter ADDRESS_BUS_WIDTH = 32;
+parameter ID_BUS_WIDTH_M = 7;
+parameter ID_BUS_WIDTH_S = 10;
+parameter CLUSTER_ID_BUS_WIDTH_M = 10;
+parameter CLUSTER_ID_BUS_WIDTH_S = 12;  // 可配置「与L2设置齐平」
+
+parameter VENUS_L1_DMAC_CFG_ADDR          = 32'h1ffe_0000;
 
 // ------ AXI interface ------ //
-typedef logic [31:0]                        axi_addr_t;
-typedef logic [ID_BUS_WIDTH - 1 :0]         axi_id_t;
-typedef logic [7:0]                         axi_len_t;
-typedef logic [2:0]                         axi_size_t;
-typedef logic [1:0]                         axi_burst_t;
-typedef logic [3:0]                         axi_cache_t;
-typedef logic [2:0]                         axi_prot_t;
-typedef logic [DATA_BUS_WIDTH - 1:0]        axi_data_t;
+typedef logic [31:0] axi_addr_t;
+typedef logic [CLUSTER_ID_BUS_WIDTH_S - 1 :0]  axi_id_t;
+typedef logic [7:0]  axi_len_t;
+typedef logic [2:0]  axi_size_t;
+typedef logic [1:0]  axi_burst_t;
+typedef logic [3:0]  axi_cache_t;
+typedef logic [2:0]  axi_prot_t;
+typedef logic [DATA_BUS_WIDTH - 1:0] axi_data_t;
 typedef logic [(DATA_BUS_WIDTH / 8) - 1:0]  axi_strb_t;
-typedef logic [1:0]                         axi_response_t;
-typedef logic [3:0]                         axi_qos_t;
-typedef logic [3:0]                         axi_region_t;
-typedef logic [5:0]                         axi_atop_t;
-typedef logic [3:0]                         axi_nsaid_t;
-typedef logic [0:0]                         axi_user_t;
+typedef logic [1:0]  axi_response_t;
+typedef logic [3:0]  axi_qos_t;
+typedef logic [3:0]  axi_region_t;
+typedef logic [5:0]  axi_atop_t;
+typedef logic [3:0]  axi_nsaid_t;
+typedef logic [0:0]  axi_user_t;
 
 // ------ Write Address Channel ------ //
 typedef struct packed {

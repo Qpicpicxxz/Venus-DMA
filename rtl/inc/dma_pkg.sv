@@ -10,7 +10,7 @@ import venus_soc_pkg::*;
 `define DMA_MAX_BEAT_BURST    256 // 1 up to 256
 `define DMA_MAX_BURST_EN      1
 
-`define VENUSDMA_CTRLREG_OFFSET   32'h2004_0000
+`define VENUSDMA_CTRLREG_OFFSET   32'h1ffe_0000
 `define VENUSDMA_CFGREG_OFFSET    6'h0
 `define VENUSDMA_SRCREG_OFFSET    6'h8
 `define VENUSDMA_DSTREG_OFFSET    6'h10
@@ -50,8 +50,8 @@ typedef enum logic [1:0] {
 // Interface between DMA FSM / Streamer and DMA CSR
 typedef struct packed {
   desc_addr_t src_addr;
-  desc_addr_t dst_addr;
   desc_num_t  num_bytes;
+  desc_addr_t dst_addr;
 } s_dma_desc_t;
 
 typedef struct packed {
@@ -73,6 +73,7 @@ typedef struct packed {
   axi_size_t    size;
   axi_strb_t    strb;
   logic         valid;
+  logic         half_trans_valid;
 } s_dma_axi_req_t;
 
 typedef struct packed {
@@ -98,12 +99,14 @@ typedef struct packed {
 typedef struct packed {
   axi_addr_t   raddr;
   axi_strb_t   rstrb;   // 备用[原本用来应对地址unligned情况的]
+  logic       half_trans_valid;
 } s_rd_req_t;
 
 typedef struct packed {
   axi_addr_t   waddr;
   axi_len_t    awlen;
   axi_strb_t   wstrb;
+  logic        half_trans_valid;
 } s_wr_req_t;
 
 typedef struct packed {

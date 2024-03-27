@@ -61,15 +61,19 @@ module dma_axi_if
   logic         err_lock_ff, next_err_lock;
   s_dma_error_t dma_error_ff, next_dma_error;
   /* 记录写打拍，决定什么时候拉高w.wlast */
+  logic         rd_beat_hpn;
   logic         wr_beat_hpn;
   logic         wr_beat_finish;
+  //logic         wr_beat_finish;
   axi_len_t     beat_counter_ff, next_beat_count;
   /* 寄存写事物传输状态[如果slave的awready消失了] */
   logic         aw_txn_started_ff, next_aw_txn;
   /* fifo是同步取数的 */
   logic         fifo_r_hpn_ff, next_fifo_r_hpn;
   logic         fifo_r_end;
-
+  /* 暂存fifo中read出来的数据 */
+  axi_data_t last_fifo_data_rd, fifo_data_rd;
+  logic      axi_w_valid;
 
   // 掩码[63:0] apply to 数据[511:0] ｜ mask[0] = 1 -> data[7:0] is valid
   function automatic axi_data_t apply_rd_strb(axi_data_t data, axi_strb_t mask);
@@ -167,6 +171,7 @@ module dma_axi_if
 
     // 握手 / 响应
     rd_txn_hpn      = axi_req_o.arvalid && axi_resp_i.arready;
+    rd_beat_hpn     = axi_resp_i.rvalid && axi_req_o.rready;
     rd_resp_hpn     = axi_resp_i.rvalid && axi_resp_i.r.rlast  && axi_req_o.rready;
     wr_txn_hpn      = axi_req_o.awvalid && axi_resp_i.awready;
     wr_beat_hpn     = axi_req_o.wvalid  && axi_resp_i.wready;
@@ -190,6 +195,12 @@ module dma_axi_if
     if(rd_txn_hpn) begin
       next_rd_txn_req.raddr = dma_axi_rd_req_i.addr;
       next_rd_txn_req.rstrb = dma_axi_rd_req_i.strb;
+      next_rd_txn_req.half_trans_valid = dma_axi_rd_req_i.half_trans_valid;
+    end else begin
+      // 半传输的时候每传输一个数据后需要修改strb
+      if(rd_txn_req_ff.half_trans_valid && rd_beat_hpn) begin
+        next_rd_txn_req.rstrb = ~rd_txn_req_ff.rstrb;
+      end
     end
 
     // 一旦write握手成功，将stream传过来的写信息寄存下来
@@ -197,6 +208,12 @@ module dma_axi_if
       next_wr_txn_req.wstrb = dma_axi_wr_req_i.strb;
       next_wr_txn_req.awlen = dma_axi_wr_req_i.alen;
       next_wr_txn_req.waddr = dma_axi_wr_req_i.addr;
+      next_wr_txn_req.half_trans_valid = dma_axi_wr_req_i.half_trans_valid;
+    end else begin
+      // 半传输的时候每传输一个数据后需要修改strb
+      if(wr_txn_req_ff.half_trans_valid && wr_beat_hpn) begin
+        next_wr_txn_req.wstrb = ~wr_txn_req_ff.wstrb;
+      end
     end
 
     // 写打拍
@@ -221,6 +238,7 @@ module dma_axi_if
     dma_axi_rd_resp_o = s_dma_axi_resp_t'('0);  // ready信号是去告诉valid源可以拉低了[已经握手成功]
     dma_axi_wr_resp_o = s_dma_axi_resp_t'('0);  // ready
     next_aw_txn       = aw_txn_started_ff;
+    fifo_data_rd      = (fifo_r_hpn_ff) ? dma_fifo_resp_i.data_rd : last_fifo_data_rd;
 
     // FSM中RUN的时候，dma_active_i就会被拉高
     if (dma_active_i) begin
@@ -263,12 +281,18 @@ module dma_axi_if
         axi_req_o.aw.awburst     = 2'b01;  // INCR传输
         next_aw_txn              = ~axi_resp_i.awready; // 让valid保持住
       end
-      if (fifo_r_hpn_ff) begin
+      if (axi_w_valid) begin
         fifo_r_end = (beat_counter_ff == wr_txn_req_ff.awlen);
-        axi_req_o.w.wdata = apply_wr_strb(dma_fifo_resp_i.data_rd, wr_txn_req_ff.wstrb);
+        axi_req_o.w.wdata = apply_wr_strb(fifo_data_rd, wr_txn_req_ff.wstrb);
         axi_req_o.w.wstrb = wr_txn_req_ff.wstrb;
         axi_req_o.w.wlast = fifo_r_end;
         axi_req_o.wvalid  = 1'b1;
+      end
+      // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
+      if(~dma_fifo_resp_i.empty) begin
+        // dma_fifo
+        dma_fifo_req_o.rd = axi_resp_i.wready && (~fifo_r_end);
+        next_fifo_r_hpn   = axi_resp_i.wready && (~fifo_r_end);
       end
       // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
       if(~dma_fifo_resp_i.empty) begin
@@ -295,6 +319,8 @@ module dma_axi_if
       beat_counter_ff   <= '0;
       aw_txn_started_ff <= 1'b0;
       fifo_r_hpn_ff     <= 'b0;
+      last_fifo_data_rd <= '0;
+      axi_w_valid       <= '0;
     end
     else begin
       rd_counter_ff     <= next_rd_counter;
@@ -306,6 +332,12 @@ module dma_axi_if
       beat_counter_ff   <= next_beat_count;
       aw_txn_started_ff <= next_aw_txn;
       fifo_r_hpn_ff     <= next_fifo_r_hpn;
+      if (axi_resp_i.wready) begin
+        axi_w_valid     <= next_fifo_r_hpn;
+      end
+      if (fifo_r_hpn_ff) begin
+        last_fifo_data_rd <= dma_fifo_resp_i.data_rd;
+      end
     end
   end
 

@@ -1,6 +1,11 @@
 module dma_func_wrapper
   import dma_pkg::*;
   import venus_soc_pkg::*;
+  import l2_scheduler_pkg::*;
+#(
+  parameter bit is_L2_scheduler_dma = 0,
+  parameter int NUM_TILE = 1
+)
 (
   input                                     clk,
   input                                     rstn,
@@ -13,7 +18,9 @@ module dma_func_wrapper
   output  s_dma_status_t                    dma_stats_o,
   // Master AXI I/F
   output  axi_req_t                         axi_req_o,
-  input   axi_resp_t                        axi_resp_i
+  input   axi_resp_t                        axi_resp_i,
+
+  input   tile_hardware_info_t [NUM_TILE - 1 : 0]  tile_hardware_info_i
 );
 
   // 「Streamer - FSM」
@@ -70,10 +77,13 @@ module dma_func_wrapper
 
   // Read
   dma_streamer #(
-    .STREAM_TYPE(0)
+    .STREAM_TYPE(0),
+    .is_L2_scheduler_dma(is_L2_scheduler_dma),
+    .NUM_TILE(NUM_TILE)
   ) u_dma_rd_streamer (
     .clk                    (clk),
     .rstn                   (rstn),
+    .dma_go_i               (dma_go_i),
     .dma_desc_i             (dma_desc_i),
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_rd_req),
@@ -81,15 +91,20 @@ module dma_func_wrapper
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_rd_valid_o),
     .dma_stream_done_o      (dma_stream_rd_done_i),
-    .dma_stream_err_o       (dma_stream_rd_err)
+    .dma_stream_err_o       (dma_stream_rd_err),
+
+    .tile_hardware_info_i   (tile_hardware_info_i)
   );
 
   // Write
   dma_streamer #(
-    .STREAM_TYPE(1)
+    .STREAM_TYPE(1),
+    .is_L2_scheduler_dma(is_L2_scheduler_dma),
+    .NUM_TILE(NUM_TILE)
   ) u_dma_wr_streamer (
     .clk                    (clk),
     .rstn                   (rstn),
+    .dma_go_i               (dma_go_i),
     .dma_desc_i             (dma_desc_i),
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_wr_req),
@@ -97,13 +112,17 @@ module dma_func_wrapper
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_wr_valid_o),
     .dma_stream_done_o      (dma_stream_wr_done_i),
-    .dma_stream_err_o       (dma_stream_wr_err)
+    .dma_stream_err_o       (dma_stream_wr_err),
+
+    .tile_hardware_info_i   (tile_hardware_info_i)
   );
 
   fifo_model #(
     .OUTPUT_DELAY(1),
     .SLOTS(`DMA_FIFO_DEPTH),
-    .WIDTH(`DMA_DATA_WIDTH)
+    .WIDTH(`DMA_DATA_WIDTH),
+    
+    .useSMICModel(1)
   ) u_dma_fifo(
     .clk              (clk),
     .rstn             (rstn),
@@ -125,8 +144,8 @@ module dma_func_wrapper
     .dma_axi_wr_req_i     (dma_axi_wr_req),
     .dma_axi_wr_resp_o    (dma_axi_wr_resp),
     // Master AXI I/F
-    .axi_req_o        (axi_req_o),
-    .axi_resp_i       (axi_resp_i),
+    .axi_req_o            (axi_req_o),
+    .axi_resp_i           (axi_resp_i),
     // From/To FIFOs interface
     .dma_fifo_req_o       (dma_fifo_req),
     .dma_fifo_resp_i      (dma_fifo_resp),

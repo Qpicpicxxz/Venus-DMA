@@ -108,11 +108,11 @@ set_wire_load_model -name Zero -library sc9mc_logic0040ll_base_rvt_c50_ss_typica
 
 
 # constraints
-createClk "clk" 2.857 [get_ports clk] [expr 2.857*0.1]
+createClk "clk" 3 [get_ports clk] [expr 3*0.1]
 
 set_ideal_network [get_ports rstn]
-set_input_delay -clock clk -max [expr 2.857*0.1] [remove_from_collection [all_inputs] [get_ports clk]] 
-set_output_delay -clock clk -max [expr 2.857*0.1] [all_outputs]
+set_input_delay -clock clk -max [expr 3*0.1] [remove_from_collection [all_inputs] [get_ports clk]] 
+set_output_delay -clock clk -max [expr 3*0.1] [all_outputs]
 
 group_path -name clk -weight 5
 group_path -name inout -from [all_inputs] -to [all_outputs]

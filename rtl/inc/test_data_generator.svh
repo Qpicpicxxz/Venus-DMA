@@ -313,7 +313,7 @@ parameter TESTDATA16384bits_4 =    {256'h508b_8d36_bfb7_e753_d4be_6511_5649_8915
                                     256'haa75_79e8_0102_6895_04ed_4893_2c21_c36e_d09d_e50c_d847_aef5_91ab_254c_c1d0_816d,
                                     256'habe0_9eb9_30eb_9ecb_3cd2_5686_90ab_184d_e32f_788a_27cc_adbf_ad9c_c635_f001_161b};
 
-bit[511:0] ddr_model[bit[511:0]];
+logic[511:0] ddr_model[bit[31:0]];
 
 class test_dma_data;
   rand  bit[511:0] data;
@@ -323,15 +323,17 @@ test_dma_data data64;
 class test_dma_desc_normal;
   randc bit[31:0]  src;
   randc bit[31:0]  dst;
-  // rand  bit[511:0] data;
+  rand  bit[31:0]  len;
   constraint ad {
-    src >= 32'h1000_0000;
-    dst >= 32'h1000_0000;
-    src <= 32'h1000_3fff;
-    dst <= 32'h1000_3fff;
-    ((src - dst > 32'h2000) || (dst - src > 32'h2000)) == 1'b1;
-    src % 64 == 0;
-    dst % 64 == 0;
+    src >= 32'h1100_0000;
+    src <= 32'h1100_3fff;
+    dst >= 32'h1400_0000;
+    dst <= 32'h1400_ffff;
+    src + len <= 32'h1100_3fff;
+    dst + len <= 32'h1400_ffff;
+    src % 32 == 0;
+    dst % 32 == 0;
+    len <= 32'h4000;
   }
 endclass
 test_dma_desc_normal desc;

@@ -20,8 +20,8 @@ module dma_axi_wrapper
 
   axi_ram_if_wrapper #(
       .DATA_WIDTH(DATA_BUS_WIDTH),
-      .ADDR_WIDTH(32),
-      .ID_WIDTH(ID_BUS_WIDTH),
+      .ADDR_WIDTH(ADDRESS_BUS_WIDTH),
+      .ID_WIDTH(ID_BUS_WIDTH_M),
       .PIPELINE_OUTPUT(0)
   ) u_cpu_axi_mem_if_wrapper (
       .aclk             (clk),
@@ -55,8 +55,15 @@ module dma_axi_wrapper
   logic next_dma_fifo_read_hpn, dma_fifo_read_hpn_ff;
   logic dma_trans_last_ff;
 
-  assign dma_fifo_read = ~(dma_stats.active | last_dma_active | dma_fifo_empty);
-  assign dma_go        = ~(dma_stats.active | last_dma_active | dma_fifo_empty);
+  assign dma_fifo_read = ~(dma_stats.active | last_dma_active | dma_fifo_empty | dma_go);
+  // assign dma_go        = ~(dma_stats.active | last_dma_active | dma_fifo_empty);
+  always_ff @(posedge clk or negedge rstn) begin
+    if (!rstn) begin
+      dma_go <= '0;
+    end else begin
+      dma_go <= dma_fifo_read;
+    end
+  end
 
   always_comb begin
     next_dma_fifo_read_hpn = dma_fifo_read;
@@ -70,10 +77,10 @@ module dma_axi_wrapper
   assign dma_error_o  = dma_stats.error;
 
   // 这里控制查看memory access是否在访问DMA的寄存器
-  assign dma_csr_req.csr_wr_en = mem_req.mem_wr_en && ({mem_req.mem_waddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
+  assign dma_csr_req.csr_wr_en = mem_req.mem_wr_en && ({mem_req.mem_waddr[31:6], 6'h0} == VENUS_L1_DMAC_CFG_ADDR);
   assign dma_csr_req.csr_waddr = axiwaddr_512to32_converter(mem_req.mem_waddr, mem_req.mem_wstrb);
   assign dma_csr_req.csr_wdata = axiwdata_512to32_converter(mem_req.mem_wstrb, mem_req.mem_wdata);
-  assign dma_csr_req.csr_rd_en = mem_req.mem_rd_en && ({mem_req.mem_raddr[31:6], 6'h0} == `VENUSDMA_CTRLREG_OFFSET);
+  assign dma_csr_req.csr_rd_en = mem_req.mem_rd_en && ({mem_req.mem_raddr[31:6], 6'h0} == VENUS_L1_DMAC_CFG_ADDR);
 
   assign mem_resp.mem_rdata = dma_csr_rd_en ? dma_csr_resp.csr_rdata : 512'h0;
 
@@ -89,7 +96,10 @@ module dma_axi_wrapper
     end
   end
 
-  dma_func_wrapper u_dma_func (
+  dma_func_wrapper #(
+    .is_L2_scheduler_dma(1),
+    .NUM_TILE(10)
+  ) u_dma_func (
     .clk              (clk),
     .rstn             (rstn),
     .dma_go_i         (dma_go),
@@ -98,7 +108,9 @@ module dma_axi_wrapper
     .dma_error_o      (dma_error),
     // Master AXI I/F
     .axi_req_o        (axi_req_o),
-    .axi_resp_i       (axi_resp_i)
+    .axi_resp_i       (axi_resp_i),
+
+    .tile_hardware_info_i ({{2{4'd0,4'd3,1'd1,1'd1,1'd1,16'd0}},{8{4'd0,4'd4,1'd1,1'd1,1'd1,16'd0}}})
   );
 
   logic [96:0] data_i;

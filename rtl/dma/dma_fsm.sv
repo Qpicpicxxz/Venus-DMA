@@ -154,7 +154,7 @@ module dma_fsm
         next_dma_error.src   = dma_stream_rd_err_i.src;
         next_dma_error.addr  = dma_stream_rd_err_i.addr;
       end
-      else if (dma_stream_wr_err_i) begin
+      else if (dma_stream_wr_err_i.valid) begin
         next_dma_error.valid = 1'b1;
         next_dma_error.src   = dma_stream_wr_err_i.src;
         next_dma_error.addr  = dma_stream_wr_err_i.addr;
@@ -176,6 +176,7 @@ module dma_fsm
       rd_desc_done_ff <= next_rd_desc_done;
       wr_desc_done_ff <= next_wr_desc_done;
       dma_error_ff    <= next_dma_error;
+      err_lock_ff     <= next_err_lock;
     end
   end
 endmodule
