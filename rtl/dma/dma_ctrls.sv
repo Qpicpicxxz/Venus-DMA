@@ -18,11 +18,13 @@
  *
  * CFGREG[0]: 启动DMA，产生dma_ctrl_write_o信号
  * CFGREG[1]: 告诉DMA这是此次散列传输的最后一个块，让DMA在传输完成这个块之后拉高L1 sheduler的中断
+ * CFGREG[2]: 清空DMA的一次中断(不负责处理error)
  *
- * STATREG[0]: 查看DMA拉高中断的原因: 0b0 - 正常散列传输完毕 ｜ 0b1 - 发生异常报错
- * STATREG[1]: 指示当前DMA的csr fifo是否满
+ * STATREG[0]: 指示当前DMA的csr fifo是否满
  *             CPU需要的行为: 如果DMA的csr_fifo满了, 就while住, 等待DMA的csr_fifo空闲
- * STATREG[2][3]: 00[RD_ERR] | 01[WR_ERR] | 10[UNALIGNED_ERR] | 11[NARROW_CROSS_ERROR]
+ * STATREG[1][2]: 00[RD_ERR] | 01[WR_ERR] | 10[UNALIGNED_ERR] | 11[NARROW_CROSS_ERROR]
+ *
+ * 启动一次DMA：【写入SRCREG+DSTREG+LENREG+CFGREG】（后面看看cpu在此期间是否需要关闭响应外部中断）
  */
 module dma_ctrls
   import venus_soc_pkg::*;
@@ -36,6 +38,7 @@ module dma_ctrls
 
   output logic        dma_ctrl_write_o,
   output logic        dma_ctrl_last_o,
+  output logic        dma_clear_irq_o,
   output desc_addr_t  dma_desc_src_o,
   output desc_addr_t  dma_desc_dst_o,
   output desc_num_t   dma_desc_len_o,
@@ -67,9 +70,10 @@ module dma_ctrls
   assign dma_lenreg_l1_wr_selected  = dma_csr_req_i.csr_wr_en && (dma_csr_req_i.csr_waddr[5:0] == `VENUSDMA_LENREG_OFFSET);
   assign dma_allcsr_l1_rd_selsected = dma_csr_req_i.csr_rd_en;
 
-  assign dma_ctrl_fifo_recoded = venusdma_cfg_ff[0];
+  assign dma_ctrl_fifo_recoded = (|venusdma_cfg_ff);
   assign dma_ctrl_write_o      = venusdma_cfg_ff[0];
   assign dma_ctrl_last_o       = venusdma_cfg_ff[1];
+  assign dma_clear_irq_o       = venusdma_cfg_ff[2];
 
   always_comb begin: push_csr_data_to_fifo
     dma_desc_src_o = '0;
@@ -108,11 +112,10 @@ module dma_ctrls
       venusdma_erraddr_ff <= '0;
     end else begin
       if (dma_status_error_i) begin
-        venusdma_stat_ff[0]   <= 1'b1; // normal - 0, error - 1
         venusdma_erraddr_ff   <= dma_error_addr_i;
-        venusdma_stat_ff[3:2] <= dma_error_src_i;
+        venusdma_stat_ff[2:1] <= dma_error_src_i;
       end
-      venusdma_stat_ff[1] <= dma_csr_fifo_full_i;
+      venusdma_stat_ff[0] <= dma_csr_fifo_full_i;
     end
   end
 

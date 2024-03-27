@@ -51,9 +51,13 @@ module dma_axi_wrapper
   csr_resp_t        dma_csr_resp; // csr out
   logic             dma_csr_rd_en;
 
+  logic             dma_clear_irq; // csr out
+  logic             dma_trans_done; // func out
+
   logic last_dma_active;  // stores the previous value of dma_active
   logic next_dma_fifo_read_hpn, dma_fifo_read_hpn_ff;
   logic dma_trans_last_ff;
+  logic [3:0] next_dma_trans_done_counter, dma_trans_done_counter_ff;
 
   assign dma_fifo_read = ~(dma_stats.active | last_dma_active | dma_fifo_empty | dma_go);
   // assign dma_go        = ~(dma_stats.active | last_dma_active | dma_fifo_empty);
@@ -73,8 +77,12 @@ module dma_axi_wrapper
     end
   end
 
-  assign dma_done_o   = dma_stats.done & dma_trans_last_ff;
-  assign dma_error_o  = dma_stats.error;
+  always_comb begin
+    dma_trans_done   = dma_stats.done & dma_trans_last_ff & (~dma_stats.error);
+    dma_error_o      = dma_stats.error;
+    next_dma_trans_done_counter = dma_trans_done_counter_ff + (dma_trans_done ? 'd1 : 'd0) - (dma_clear_irq ? 'd1 : 'd0);
+    dma_done_o = (|dma_trans_done_counter_ff); // 如果counter！=0，那么就一直产生中断
+  end
 
   // 这里控制查看memory access是否在访问DMA的寄存器
   assign dma_csr_req.csr_wr_en = mem_req.mem_wr_en && ({mem_req.mem_waddr[31:6], 6'h0} == VENUS_L1_DMAC_CFG_ADDR);
@@ -89,10 +97,12 @@ module dma_axi_wrapper
       dma_csr_rd_en        <= 1'b0;
       last_dma_active      <= 1'b0;
       dma_fifo_read_hpn_ff <= 1'b0;
+      dma_trans_done_counter_ff <= '0;
     end else begin
       dma_csr_rd_en        <= dma_csr_req.csr_rd_en;
       last_dma_active      <= dma_stats.active;
       dma_fifo_read_hpn_ff <= next_dma_fifo_read_hpn;
+      dma_trans_done_counter_ff <= next_dma_trans_done_counter;
     end
   end
 
@@ -144,6 +154,7 @@ module dma_axi_wrapper
     // CSR DMA I/F
     .dma_ctrl_write_o     (dma_csr2fifo_write),
     .dma_ctrl_last_o      (dma_csr2fifo_last),
+    .dma_clear_irq_o      (dma_clear_irq),
     .dma_desc_src_o       (dma_csr2fifo_desc.src_addr),
     .dma_desc_dst_o       (dma_csr2fifo_desc.dst_addr),
     .dma_desc_len_o       (dma_csr2fifo_desc.num_bytes),
