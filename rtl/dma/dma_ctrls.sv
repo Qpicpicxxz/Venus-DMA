@@ -77,6 +77,8 @@ module dma_ctrls
 
   always_comb begin: push_csr_data_to_fifo
     dma_desc_src_o = '0;
+    dma_desc_dst_o = '0;
+    dma_desc_len_o = '0;
     if (dma_ctrl_write_o) begin
       dma_desc_src_o = desc_addr_t'(venusdma_src_ff);
       dma_desc_dst_o = desc_addr_t'(venusdma_dst_ff);

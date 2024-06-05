@@ -69,17 +69,11 @@ module dma_axi_wrapper
     end
   end
 
-  always_comb begin
-    next_dma_fifo_read_hpn = dma_fifo_read;
-    // fifo读取延迟一拍: 读出当前dma请求是否是最后一个请求块
-    if (dma_fifo_read_hpn_ff) begin
-      dma_trans_last_ff = dma_trans_last;
-    end
-  end
 
   always_comb begin
-    dma_trans_done   = dma_stats.done & dma_trans_last_ff & (~dma_stats.error);
-    dma_error_o      = dma_stats.error;
+    next_dma_fifo_read_hpn = dma_fifo_read;
+    dma_trans_done         = dma_stats.done & dma_trans_last_ff & (~dma_stats.error);
+    dma_error_o            = dma_stats.error;
     next_dma_trans_done_counter = dma_trans_done_counter_ff + (dma_trans_done ? 'd1 : 'd0) - (dma_clear_irq ? 'd1 : 'd0);
     dma_done_o = (|dma_trans_done_counter_ff); // 如果counter！=0，那么就一直产生中断
   end
@@ -94,21 +88,25 @@ module dma_axi_wrapper
 
   always_ff @(posedge clk or negedge rstn) begin
     if (!rstn) begin
-      dma_csr_rd_en        <= 1'b0;
-      last_dma_active      <= 1'b0;
-      dma_fifo_read_hpn_ff <= 1'b0;
+      dma_csr_rd_en             <= 1'b0;
+      last_dma_active           <= 1'b0;
+      dma_fifo_read_hpn_ff      <= 1'b0;
       dma_trans_done_counter_ff <= '0;
+      dma_trans_last_ff         <= '0;
     end else begin
-      dma_csr_rd_en        <= dma_csr_req.csr_rd_en;
-      last_dma_active      <= dma_stats.active;
-      dma_fifo_read_hpn_ff <= next_dma_fifo_read_hpn;
+      dma_csr_rd_en             <= dma_csr_req.csr_rd_en;
+      last_dma_active           <= dma_stats.active;
+      dma_fifo_read_hpn_ff      <= next_dma_fifo_read_hpn;
       dma_trans_done_counter_ff <= next_dma_trans_done_counter;
+      if (dma_fifo_read_hpn_ff) begin
+        dma_trans_last_ff <= dma_trans_last;
+      end
     end
   end
 
   dma_func_wrapper #(
-    .is_L2_scheduler_dma(1),
-    .NUM_TILE(10)
+    .is_L2_scheduler_dma(0),
+    .NUM_TILE(1)
   ) u_dma_func (
     .clk              (clk),
     .rstn             (rstn),
@@ -120,7 +118,7 @@ module dma_axi_wrapper
     .axi_req_o        (axi_req_o),
     .axi_resp_i       (axi_resp_i),
 
-    .tile_hardware_info_i ({{2{4'd0,4'd3,1'd1,1'd1,1'd1,16'd0}},{8{4'd0,4'd4,1'd1,1'd1,1'd1,16'd0}}})
+    .tile_hardware_info_i ('0      )
   );
 
   logic [96:0] data_i;
@@ -136,7 +134,7 @@ module dma_axi_wrapper
   ) u_dma_csr_fifo (
     .clk        (clk),
     .rstn       (rstn),
-    .clear_i    (),
+    .clear_i    (1'b0),
     .write_i    (dma_csr2fifo_write),
     .read_i     (dma_fifo_read),
     .data_i     (data_i),
