@@ -225,6 +225,7 @@ module dma_axi_if
     if (wr_beat_finish) begin
       next_beat_count = 0;
     end
+
   end
 
   always_comb begin : axi4_master
@@ -287,6 +288,7 @@ module dma_axi_if
         axi_req_o.w.wstrb = wr_txn_req_ff.wstrb;
         axi_req_o.w.wlast = fifo_r_end;
         axi_req_o.wvalid  = 1'b1;
+        dma_axi_wr_resp_o.finish = fifo_r_end;
       end
       // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
       if(~dma_fifo_resp_i.empty) begin
@@ -304,6 +306,9 @@ module dma_axi_if
       if (axi_resp_i.bvalid) begin
         // 10 - SLVERR「Slave错误」 | 10 - DECERR「总线解码错误」
         wr_err_hpn  = (axi_resp_i.b.bresp == 2'b10) || (axi_resp_i.b.bresp == 2'b11);
+      end
+      if (rd_resp_hpn) begin
+        dma_axi_rd_resp_o.finish = 1'b1;
       end
     end
   end : axi4_master

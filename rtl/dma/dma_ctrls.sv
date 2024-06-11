@@ -113,6 +113,7 @@ module dma_ctrls
       venusdma_stat_ff    <= '0;
       venusdma_erraddr_ff <= '0;
     end else begin
+      venusdma_stat_ff[31:3] <= venusdma_stat_ff[31:3];
       if (dma_status_error_i) begin
         venusdma_erraddr_ff   <= dma_error_addr_i;
         venusdma_stat_ff[2:1] <= dma_error_src_i;

@@ -12,6 +12,7 @@ module Multiplexer import venus_soc_pkg::*; #(
       if (master_ctrl == 1'b1) begin
         axi_req_o = axi_req_o_dma; // DMA操控
         axi_resp_i_dma = axi_resp_i;
+        // axi_resp_i_dma.awready = 1'b1;
         axi_resp_i_bfm = '0;
       end else begin
         axi_req_o = axi_req_o_bfm; // BFM操控

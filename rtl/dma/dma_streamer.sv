@@ -40,14 +40,15 @@ module dma_streamer
   s_dma_axi_req_t   dma_req_ff, next_dma_req;  // Stream - AXI IF | addr | alen | size | strb | valid
 
   logic             last_txn_ff, next_last_txn;
-  logic             last_txn_proc;
 
   logic             addr_unaligned_err, addr_cross_bound_err;
   logic             err_lock_ff, next_err_lock;
   s_dma_error_t     dma_error_ff, next_dma_error;
 
   s_dma_desc_t      dma_desc_ff, next_dma_desc;
-  
+  logic             stream_lock_ff, next_stream_lock;
+  logic             stream_compute_ready;
+
   assign next_dma_desc = dma_go_i ? dma_desc_i : dma_desc_ff;
 
   // 检查源地址与目的地址是否4kB越界 ｜ [0 - 越界] [1 - 未越界]
@@ -159,7 +160,7 @@ module dma_streamer
   function automatic logic is_addr_aligned(axi_addr_t addr);
       return (addr[5:0] == '0);
   endfunction
-  
+
   function automatic logic is_addr_half_aligned(axi_addr_t addr);
       return (addr[4:0] == '0);
   endfunction
@@ -247,6 +248,16 @@ module dma_streamer
     endcase
   end : streamer_status
 
+  always_comb begin: stream_lock
+    next_stream_lock = stream_lock_ff;
+    if (dma_axi_resp_i.ready) begin
+      next_stream_lock = 1'b1;
+    end
+    if (dma_axi_resp_i.finish) begin
+      next_stream_lock = 1'b0;
+    end
+  end: stream_lock
+
   // Streamer负责计算突发次数等
   always_comb begin : burst_calc
     // 负责捕捉错误信号
@@ -257,24 +268,25 @@ module dma_streamer
     next_desc_this_addr      = desc_this_addr_ff;
     next_desc_opposite_addr  = desc_opposite_addr_ff;
     next_desc_bytes          = desc_bytes_ff;  // 默认下一拍保持不变
-    dma_axi_req_o            = dma_req_ff;
     next_last_txn            = last_txn_ff;
-    last_txn_proc            = 1'b0;
+    stream_compute_ready     = (dma_axi_resp_i.ready) && (~stream_lock_ff);
+    // lock
+    dma_axi_req_o            = (stream_lock_ff) ? '0 : dma_req_ff;
 
     // FSM valid进来的那一拍 / dma_go_i的下一拍
     if ((cur_st_ff == DMA_ST_SM_IDLE) && (next_st == DMA_ST_SM_RUN)) begin
       // 如果传输长度 < 64bytes, 则保留原值 ｜ 如果传输长度 >= 64bytes, 则传输长度64byte向上对齐
-      next_desc_bytes = enough_for_burst(dma_desc_ff.num_bytes)      && is_addr_aligned(dma_desc_ff.dst_addr)      && is_addr_aligned(dma_desc_ff.src_addr)      ? celi_align64_bytes(dma_desc_ff.num_bytes) : 
-                        enough_for_half_burst(dma_desc_ff.num_bytes) && is_addr_half_aligned(dma_desc_ff.dst_addr) && is_addr_half_aligned(dma_desc_ff.src_addr) ? celi_align32_bytes(dma_desc_ff.num_bytes) : 
+      next_desc_bytes = enough_for_burst(dma_desc_ff.num_bytes)      && is_addr_aligned(dma_desc_ff.dst_addr)      && is_addr_aligned(dma_desc_ff.src_addr)      ? celi_align64_bytes(dma_desc_ff.num_bytes) :
+                        enough_for_half_burst(dma_desc_ff.num_bytes) && is_addr_half_aligned(dma_desc_ff.dst_addr) && is_addr_half_aligned(dma_desc_ff.src_addr) ? celi_align32_bytes(dma_desc_ff.num_bytes) :
                                                                                                                                                                    dma_desc_ff.num_bytes;
 
       // 读模块 or 写模块
       if (STREAM_TYPE) begin
-        next_desc_this_addr = dma_desc_ff.dst_addr;
+        next_desc_this_addr     = dma_desc_ff.dst_addr;
         next_desc_opposite_addr = dma_desc_ff.src_addr;
       end
       else begin
-        next_desc_this_addr = dma_desc_ff.src_addr;
+        next_desc_this_addr     = dma_desc_ff.src_addr;
         next_desc_opposite_addr = dma_desc_ff.dst_addr;
       end
     end
@@ -284,7 +296,7 @@ module dma_streamer
     // 对给AXI IF 的突发信息进行计算
     if (cur_st_ff == DMA_ST_SM_RUN) begin
       // 请求未发出(first request) - [~dma_req_ff.valid] 或 请求已发出且收到ready[是slave的arready] 且 不是最后一个request - [~last_txn_ff]
-      if ((~dma_req_ff.valid || (dma_req_ff.valid && dma_axi_resp_i.ready)) && ~last_txn_ff) begin
+      if ((~dma_req_ff.valid || (dma_req_ff.valid && stream_compute_ready)) && ~last_txn_ff) begin
         // 4种情况：1. 地址对齐+传输长度>=64bytes | 2. 读地址半对齐 + 写地址半对齐 + 传输长度 >= 32bytes | 2. 地址未对齐+传输长度>=64bytes ｜ 3. 传输长度<64bytes
 
         // 1. 常规情况：读地址对齐 + 写地址对齐 + 传输长度 >= 64bytes
@@ -294,24 +306,24 @@ module dma_streamer
                   && is_NOT_4lane_vrf_addr(desc_this_addr_ff) && is_NOT_4lane_vrf_addr(desc_opposite_addr_ff)) begin
           // 在一次事物中传输尽可能多的数据
           next_dma_req.addr = desc_this_addr_ff;    // TODO: 在这里可以进行地址对齐
-          next_dma_req.size = axi_size_t'(6);  // TODO: 在这里可以配置size/数据位宽
+          next_dma_req.size = axi_size_t'(6);       // TODO: 在这里可以配置size/数据位宽
 
           next_dma_req.alen = great_alen(desc_this_addr_ff, desc_bytes_ff);
-          next_dma_req.strb = '1;              // TODO: 在这里可以配置strb
+          next_dma_req.strb = '1;                   // TODO: 在这里可以配置strb
 
           txn_bytes           = max_bytes_t'((next_dma_req.alen+8'd1)*bytes_p_burst);  // 计算本次burst传输的实际比特数
           next_desc_bytes     = desc_bytes_ff - desc_num_t'(txn_bytes);
           next_last_txn       = (next_desc_bytes == '0);
           next_desc_this_addr = desc_this_addr_ff + axi_addr_t'(txn_bytes);  // TODO: 在这里可以配置自增步长
 
-          next_dma_req.valid = 1'b1;
+          next_dma_req.valid            = 1'b1;
           next_dma_req.half_trans_valid = 1'b0;
         end
         // 2. 半传输情况：读地址半对齐 + 写地址半对齐 + 传输长度 >= 32bytes (地址全对齐的情况也满足地址半对齐条件)
         else if(is_addr_half_aligned(desc_this_addr_ff) && is_addr_half_aligned(desc_opposite_addr_ff) && enough_for_half_burst(desc_bytes_ff)) begin
           // 在一次事物中传输尽可能多的数据
           next_dma_req.addr = desc_this_addr_ff;    // TODO: 在这里可以进行地址对齐
-          next_dma_req.size = axi_size_t'(5);  // TODO: 在这里可以配置size/数据位宽
+          next_dma_req.size = axi_size_t'(5);       // TODO: 在这里可以配置size/数据位宽
 
           next_dma_req.alen = great_half_alen(desc_this_addr_ff, desc_bytes_ff);
           next_dma_req.strb = desc_this_addr_ff[5] ? 64'hffff_ffff_0000_0000 : 64'h0000_0000_ffff_ffff; // TODO: 在这里可以配置strb
@@ -321,7 +333,7 @@ module dma_streamer
           next_last_txn       = (next_desc_bytes == '0);
           next_desc_this_addr = desc_this_addr_ff + axi_addr_t'(txn_bytes);  // TODO: 在这里可以配置自增步长
 
-          next_dma_req.valid = 1'b1;
+          next_dma_req.valid            = 1'b1;
           next_dma_req.half_trans_valid = 1'b1;
         end
         // 3. 异常情况：地址未对齐 + 传输长度 >= 64bytes
@@ -335,31 +347,35 @@ module dma_streamer
             addr_cross_bound_err = 1'b1;
           end
           else begin
-            next_dma_req.addr = floor_align64_addr(desc_this_addr_ff);
-            next_dma_req.size = axi_size_t'(6);
-            next_dma_req.alen = '0;
-            next_dma_req.strb = get_strb(desc_this_addr_ff, desc_bytes_ff);
-            next_desc_bytes   = '0;
-            next_last_txn = 1'b1;
-            next_dma_req.valid = 1'b1;
+            next_dma_req.addr             = floor_align64_addr(desc_this_addr_ff);
+            next_dma_req.size             = axi_size_t'(6);
+            next_dma_req.alen             = '0;
+            next_dma_req.strb             = get_strb(desc_this_addr_ff, desc_bytes_ff);
+            next_desc_bytes               = '0;
+            next_last_txn                 = 1'b1;
+            next_dma_req.valid            = 1'b1;
             next_dma_req.half_trans_valid = 1'b0;
           end
         end
       end
       // 如果此时已经是最后一次数据突发请求，置位给AXI IF对
-      else if (last_txn_ff && dma_axi_resp_i.ready) begin
+      else if (last_txn_ff && stream_compute_ready) begin
         next_dma_req = s_dma_axi_req_t'('0);
         next_last_txn = 1'b0;
       end
       else begin
-        if (dma_req_ff.valid && ~dma_axi_resp_i.ready) begin
-          last_txn_proc = 'b1;
-        end
-        else begin
+        // if (dma_req_ff.valid && ~stream_compute_ready) begin
+          // 有valid且stream compute锁住了，证明axi if在工作
+        //   // next_dma_req = '0;
+        // end
+        // if (!(dma_req_ff.valid && ~stream_compute_ready)) begin
+        if (!dma_req_ff.valid || stream_compute_ready) begin
           next_dma_req = s_dma_axi_req_t'('0);
         end
       end
     end
+
+    // stop stream request
 
     dma_stream_done_o = ((cur_st_ff == DMA_ST_SM_RUN) && (next_st == DMA_ST_SM_IDLE));
   end : burst_calc
@@ -375,6 +391,7 @@ module dma_streamer
       err_lock_ff            <= 1'b0;
       dma_error_ff           <= s_dma_error_t'('0);
       dma_desc_ff            <= s_dma_desc_t'('0);
+      stream_lock_ff         <= 1'b0;
     end
     else begin
       cur_st_ff              <= next_st;
@@ -386,6 +403,7 @@ module dma_streamer
       err_lock_ff            <= next_err_lock;
       dma_error_ff           <= next_dma_error;
       dma_desc_ff            <= next_dma_desc;
+      stream_lock_ff         <= next_stream_lock;
     end
   end
 endmodule

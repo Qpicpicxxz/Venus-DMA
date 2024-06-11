@@ -78,6 +78,7 @@ typedef struct packed {
 
 typedef struct packed {
   logic       ready;
+  logic       finish;
 } s_dma_axi_resp_t;
 
 // Interface between DMA FIFOs and DMA AXI
