@@ -88,6 +88,26 @@ always begin
   #10 clk = ~clk;
 end
 
+task start_dma_transfer;
+  input logic [31:0] src_addr;
+  input logic [31:0] dst_addr;
+  input logic [31:0] num_bytes;
+  begin
+    $display("Starts transfer: %h to %h, len is %h\n", src_addr, dst_addr, num_bytes);
+    @(posedge clk)begin
+      dma_desc.src_addr  = src_addr;
+      dma_desc.dst_addr  = dst_addr;
+      dma_desc.num_bytes = num_bytes;
+      dma_go_i = 1'b1;
+    end
+    @(posedge clk)begin
+      dma_desc = '0;
+      dma_go_i = 1'b0;
+    end
+  end
+endtask
+
+
 // 测试激励
 initial begin
   $display("[%0t]: Reseting all module...", $time);
@@ -110,16 +130,36 @@ initial begin
   $display("[%0t]: Start initializing memory..", $time);
 
   master_ctrl = 1'b1; // change to DMA
-  dma_desc.src_addr  = 32'h0000_0000;
-  dma_desc.dst_addr  = 32'h1100_0000;
-  dma_desc.num_bytes = 32'h30;
+
+  start_dma_transfer(32'h0000_0000,32'h1100_0000,32'h30);
+  @(posedge dma_stats.done);
+  start_dma_transfer(32'h0000_0000,32'h2100_0000,32'h320);
+  @(posedge dma_stats.done);
+  start_dma_transfer(32'h0001_0000,32'h4100_0000,32'h600);
+  @(posedge dma_stats.done);
+  start_dma_transfer(32'h0000_0100,32'h3100_0000,32'h1000);
+  @(posedge dma_stats.done);
+  start_dma_transfer(32'h0000_1900,32'h1100_0000,32'h22c0);
+  @(posedge dma_stats.done);
+  start_dma_transfer(32'h0000_0008,32'h1100_0000,32'h24);
+
+  // dma_desc.src_addr  = 32'h0000_0000;
+  // dma_desc.dst_addr  = 32'h1100_0000;
+  // dma_desc.num_bytes = 32'h30;
+  // @(posedge clk);
   // dma_go_i = 1'b1;
-  // repeat(1) @(posedge clk);
+  // @(posedge clk);
   // dma_go_i = 1'b0;
-  @(posedge clk);
-  dma_go_i = 1'b1;
-  @(posedge clk);
-  dma_go_i = 1'b0;
+
+  // dma_desc.src_addr  = 32'h0000_0000;
+  // dma_desc.dst_addr  = 32'h2100_0000;
+  // dma_desc.num_bytes = 32'h320;
+  // @(posedge clk);
+  // dma_go_i = 1'b1;
+  // @(posedge clk);
+  // dma_go_i = 1'b0;
+
+
   repeat(5000) @(posedge clk);
   master_ctrl = 1'b0;
   u_axi4_master_bfm.BFM_READ_BURST2048(32'h1100_0000,32'h0000_0000,response16384,`ENABLE_MESSAGE);

@@ -1,11 +1,6 @@
 module dma_func_wrapper
   import dma_pkg::*;
   import venus_soc_pkg::*;
-  import l2_scheduler_pkg::*;
-#(
-  parameter bit is_L2_scheduler_dma = 0,
-  parameter int NUM_TILE = 1
-)
 (
   input                                     clk,
   input                                     rstn,
@@ -18,9 +13,7 @@ module dma_func_wrapper
   output  s_dma_status_t                    dma_stats_o,
   // Master AXI I/F
   output  axi_req_t                         axi_req_o,
-  input   axi_resp_t                        axi_resp_i,
-
-  input   tile_hardware_info_t [NUM_TILE - 1 : 0]  tile_hardware_info_i
+  input   axi_resp_t                        axi_resp_i
 );
 
   // 「Streamer - FSM」
@@ -77,9 +70,7 @@ module dma_func_wrapper
 
   // Read
   dma_streamer #(
-    .STREAM_TYPE(0),
-    .is_L2_scheduler_dma(is_L2_scheduler_dma),
-    .NUM_TILE(NUM_TILE)
+    .STREAM_TYPE(0)
   ) u_dma_rd_streamer (
     .clk                    (clk),
     .rstn                   (rstn),
@@ -91,16 +82,12 @@ module dma_func_wrapper
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_rd_valid_o),
     .dma_stream_done_o      (dma_stream_rd_done_i),
-    .dma_stream_err_o       (dma_stream_rd_err),
-
-    .tile_hardware_info_i   (tile_hardware_info_i)
+    .dma_stream_err_o       (dma_stream_rd_err)
   );
 
   // Write
   dma_streamer #(
-    .STREAM_TYPE(1),
-    .is_L2_scheduler_dma(is_L2_scheduler_dma),
-    .NUM_TILE(NUM_TILE)
+    .STREAM_TYPE(1)
   ) u_dma_wr_streamer (
     .clk                    (clk),
     .rstn                   (rstn),
@@ -112,16 +99,13 @@ module dma_func_wrapper
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_wr_valid_o),
     .dma_stream_done_o      (dma_stream_wr_done_i),
-    .dma_stream_err_o       (dma_stream_wr_err),
-
-    .tile_hardware_info_i   (tile_hardware_info_i)
+    .dma_stream_err_o       (dma_stream_wr_err)
   );
 
   fifo_model #(
     .OUTPUT_DELAY(1),
     .SLOTS(`DMA_FIFO_DEPTH),
     .WIDTH(`DMA_DATA_WIDTH),
-
     .useSMICModel(1)
   ) u_dma_fifo(
     .clk              (clk),
@@ -188,7 +172,7 @@ module dma_func_wrapper
 
   always_ff @(posedge clk or negedge rstn) begin
     if (dma_go_i) begin
-      $fwrite(dma_read_data_file, "src: %h | dst: %h | len: %h\ndata:\n", dma_desc_i.src_addr, dma_desc_i.dst_addr, dma_desc_i.num_bytes);
+      $fwrite(dma_read_data_file, "\nsrc: %h | dst: %h | len: %h\ndata:\n", dma_desc_i.src_addr, dma_desc_i.dst_addr, dma_desc_i.num_bytes);
     end
     if (dma_stats_o.active & axi_req_o.wvalid) begin
       write_data_to_file(axi_req_o.w.wdata, axi_req_o.w.wstrb, dma_read_data_file);

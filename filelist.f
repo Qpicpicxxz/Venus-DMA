@@ -7,7 +7,7 @@
 ./rtl/dma/dma_fsm.sv
 ./rtl/dma/dma_streamer.sv
 ./rtl/dma/dma_ctrls.sv
-./rtl/dma_func_wrapper.sv
+./rtl/dma/dma_func_wrapper.sv
 ./rtl/dma/dma_axi_wrapper.sv
 
 ./rtl/bfm/cdn_axi4_master_bfm.v

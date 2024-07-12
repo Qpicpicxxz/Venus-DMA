@@ -73,7 +73,7 @@ typedef struct packed {
   axi_size_t    size;
   axi_strb_t    strb;
   logic         valid;
-  logic         half_trans_valid;
+  // logic         half_trans_valid;
 } s_dma_axi_req_t;
 
 typedef struct packed {

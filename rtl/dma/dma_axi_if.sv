@@ -195,12 +195,6 @@ module dma_axi_if
     if(rd_txn_hpn) begin
       next_rd_txn_req.raddr = dma_axi_rd_req_i.addr;
       next_rd_txn_req.rstrb = dma_axi_rd_req_i.strb;
-      next_rd_txn_req.half_trans_valid = dma_axi_rd_req_i.half_trans_valid;
-    end else begin
-      // 半传输的时候每传输一个数据后需要修改strb
-      if(rd_txn_req_ff.half_trans_valid && rd_beat_hpn) begin
-        next_rd_txn_req.rstrb = ~rd_txn_req_ff.rstrb;
-      end
     end
 
     // 一旦write握手成功，将stream传过来的写信息寄存下来
@@ -208,12 +202,6 @@ module dma_axi_if
       next_wr_txn_req.wstrb = dma_axi_wr_req_i.strb;
       next_wr_txn_req.awlen = dma_axi_wr_req_i.alen;
       next_wr_txn_req.waddr = dma_axi_wr_req_i.addr;
-      next_wr_txn_req.half_trans_valid = dma_axi_wr_req_i.half_trans_valid;
-    end else begin
-      // 半传输的时候每传输一个数据后需要修改strb
-      if(wr_txn_req_ff.half_trans_valid && wr_beat_hpn) begin
-        next_wr_txn_req.wstrb = ~wr_txn_req_ff.wstrb;
-      end
     end
 
     // 写打拍
