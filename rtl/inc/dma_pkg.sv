@@ -7,7 +7,7 @@ import venus_soc_pkg::*;
 // FIFO size in bytes = (DMA_FIFO_DEPTH*(AXI_DATA_WIDTH/8))
 `define DMA_FIFO_DEPTH        256 // Must be power of 2
 `define DMA_ID_WIDTH          `AXI_TXN_ID_WIDTH
-`define DMA_MAX_BEAT_BURST    256 // 1 up to 256
+`define DMA_MAX_BEAT_BURST    64 // 1 up to 256
 `define DMA_MAX_BURST_EN      1
 
 `define VENUSDMA_CTRLREG_OFFSET   32'h1ffe_0000

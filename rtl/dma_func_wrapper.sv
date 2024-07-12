@@ -121,7 +121,7 @@ module dma_func_wrapper
     .OUTPUT_DELAY(1),
     .SLOTS(`DMA_FIFO_DEPTH),
     .WIDTH(`DMA_DATA_WIDTH),
-    
+
     .useSMICModel(1)
   ) u_dma_fifo(
     .clk              (clk),
@@ -155,4 +155,43 @@ module dma_func_wrapper
     .clear_dma_i          (clear_dma),
     .dma_active_i         (dma_active)
   );
+
+  task write_data_to_file;
+        input logic [511:0] wdata;
+        input logic [63:0] wstrb;
+        input integer file;
+        integer i;
+        reg [7:0] wdata_byte;
+        reg [511:0] wstrb_masked_data;
+    begin
+        wstrb_masked_data = 512'b0;
+        for (i = 0; i < 64; i = i + 1) begin
+            wdata_byte = wdata[i*8 +: 8];
+            if (wstrb[i]) begin
+                wstrb_masked_data[i*8 +: 8] = wdata_byte;
+            end else begin
+                wstrb_masked_data[i*8 +: 8] = 8'hXX;
+            end
+        end
+        $fwrite(file, "%h\n", wstrb_masked_data);
+    end
+  endtask
+
+  int dma_read_data_file;
+  initial begin
+    dma_read_data_file = $fopen("./dma_read_data_file.txt", "wb");
+    if (dma_read_data_file == 0) begin
+      $display("Error opening dma_read_data_file!");
+      $stop;//$finish;
+    end
+  end
+
+  always_ff @(posedge clk or negedge rstn) begin
+    if (dma_go_i) begin
+      $fwrite(dma_read_data_file, "src: %h | dst: %h | len: %h\ndata:\n", dma_desc_i.src_addr, dma_desc_i.dst_addr, dma_desc_i.num_bytes);
+    end
+    if (dma_stats_o.active & axi_req_o.wvalid) begin
+      write_data_to_file(axi_req_o.w.wdata, axi_req_o.w.wstrb, dma_read_data_file);
+    end
+  end
 endmodule
