@@ -21,8 +21,8 @@ module dma_axi_if
   // From/To FIFOs interface
   // `s_dma_fifo_req_t` : wr | rd | data_wr
   // `s_dma_fifo_resp_t`: data_rd | ocup | space | full | empty
-  output  s_dma_fifo_req_t  dma_fifo_req_o,
-  input   s_dma_fifo_resp_t dma_fifo_resp_i,
+  output  s_dma_fifo_req_t  dma_aligner_req_o,
+  input   s_dma_fifo_resp_t dma_aligner_resp_i,
 
   // From/To DMA FSM
   output  logic             axi_pend_txn_o,
@@ -58,7 +58,7 @@ module dma_axi_if
   /* 错误发生相关 */
   logic         rd_err_hpn;
   logic         wr_err_hpn;
-  logic         err_lock_ff, next_err_lock;
+  logic         err_lock_ff,  next_err_lock;
   s_dma_error_t dma_error_ff, next_dma_error;
   /* 记录写打拍，决定什么时候拉高w.wlast */
   logic         rd_beat_hpn;
@@ -73,6 +73,7 @@ module dma_axi_if
   logic         fifo_r_end;
   /* 暂存fifo中read出来的数据 */
   axi_data_t last_fifo_data_rd, fifo_data_rd;
+  axi_data_t last_fifo_data_strb, fifo_data_strb;
   logic      axi_w_valid;
 
   // 掩码[63:0] apply to 数据[511:0] ｜ mask[0] = 1 -> data[7:0] is valid
@@ -216,6 +217,10 @@ module dma_axi_if
 
   end
 
+  always_comb begin: realignment_buffer
+
+  end: realignment_buffer
+
   always_comb begin : axi4_master
     // 负责捕捉错误信号
     rd_err_hpn        = 1'b0;
@@ -223,11 +228,15 @@ module dma_axi_if
     fifo_r_end        = 1'b0;
     next_fifo_r_hpn   = 1'b0;
     axi_req_o         = axi_req_t'('0);         // 给AXI总线的信号
-    dma_fifo_req_o    = s_dma_fifo_req_t'('0);  // 给数据缓存FIFO的信号 [wr | rd | wr_data]
+    // dma_fifo_req_o    = s_dma_fifo_req_t'('0);  // 给数据缓存FIFO的信号 [wr | rd | wr_data]
+    dma_aligner_req_o = '0;
     dma_axi_rd_resp_o = s_dma_axi_resp_t'('0);  // ready信号是去告诉valid源可以拉低了[已经握手成功]
     dma_axi_wr_resp_o = s_dma_axi_resp_t'('0);  // ready
     next_aw_txn       = aw_txn_started_ff;
-    fifo_data_rd      = (fifo_r_hpn_ff) ? dma_fifo_resp_i.data_rd : last_fifo_data_rd;
+    // fifo_data_rd      = (fifo_r_hpn_ff) ? dma_fifo_resp_i.data_rd : last_fifo_data_rd;
+    // TODO: 这个需要改到shift aligner里面去保证读了一次之后数据保持？
+    fifo_data_rd      = (fifo_r_hpn_ff) ? dma_aligner_resp_i.data_rd : last_fifo_data_rd;
+    fifo_data_strb    = (fifo_r_hpn_ff) ? dma_aligner_resp_i.strb : last_fifo_data_strb;
 
     // FSM中RUN的时候，dma_active_i就会被拉高
     if (dma_active_i) begin
@@ -245,23 +254,30 @@ module dma_axi_if
         axi_req_o.ar.arburst = 2'b01;  // INCR传输
       end
       // [给slave读数据 rready] - 如果FIFO没有满，那就准备好读数据
-      axi_req_o.rready = (~dma_fifo_resp_i.full);
+      // axi_req_o.rready = (~dma_fifo_resp_i.full);
+      axi_req_o.rready = (~dma_aligner_resp_i.full);
       // 等待slave的valid...
-      if (axi_resp_i.rvalid && (~dma_fifo_resp_i.full)) begin
-        dma_fifo_req_o.wr      = 1'b1;
-        dma_fifo_req_o.data_wr = apply_rd_strb(axi_resp_i.r.rdata, rd_txn_req_ff.rstrb);
+      // if (axi_resp_i.rvalid && (~dma_fifo_resp_i.full)) begin
+      if (axi_resp_i.rvalid && (~dma_aligner_resp_i.full)) begin
+        // dma_fifo_req_o.wr      = 1'b1;
+        dma_aligner_req_o.wr = 1'b1;
+        dma_aligner_req_o.data_wr = axi_resp_i.r.rdata;
+        dma_aligner_req_o.rvalid = 1'b1;
+        dma_aligner_req_o.rlast = axi_resp_i.r.rlast;
+        // dma_fifo_req_o.data_wr = apply_rd_strb(axi_resp_i.r.rdata, rd_txn_req_ff.rstrb);
         if (axi_resp_i.r.rlast && axi_req_o.rready) begin
           // 10 - SLVERR「Slave错误」 | 10 - DECERR「总线解码错误」
           rd_err_hpn = (axi_resp_i.r.rresp == 2'b10) || (axi_resp_i.r.rresp == 2'b11);
-          // rd_err_hpn = 1'b1;
         end
       end
+
 
       /* 写slave操作 */
       axi_req_o.aw.awprot = 3'b010;
       axi_req_o.aw.awid   = axi_id_t'(0);
       // [给slave写地址 awvalid] - Streamer传过来的valid 或 写操作已经开始但是awready消失
-      axi_req_o.awvalid = ((dma_axi_wr_req_i.valid && (~dma_fifo_resp_i.empty)) || aw_txn_started_ff);
+      // axi_req_o.awvalid = ((dma_axi_wr_req_i.valid && (~dma_fifo_resp_i.empty)) || aw_txn_started_ff);
+      axi_req_o.awvalid = ((dma_axi_wr_req_i.valid && (~dma_aligner_resp_i.empty)) || aw_txn_started_ff);
       if (axi_req_o.awvalid) begin
         dma_axi_wr_resp_o.ready  = axi_resp_i.awready;
         axi_req_o.aw.awaddr      = dma_axi_wr_req_i.addr;
@@ -272,23 +288,22 @@ module dma_axi_if
       end
       if (axi_w_valid) begin
         fifo_r_end = (beat_counter_ff == wr_txn_req_ff.awlen);
-        axi_req_o.w.wdata = apply_wr_strb(fifo_data_rd, wr_txn_req_ff.wstrb);
-        axi_req_o.w.wstrb = wr_txn_req_ff.wstrb;
+        // axi_req_o.w.wdata = apply_wr_strb(fifo_data_rd, dma_aligner_resp_i.strb);
+        axi_req_o.w.wdata = fifo_data_rd;
+        axi_req_o.w.wstrb = dma_aligner_resp_i.strb;  // 寄存一下这个strb
         axi_req_o.w.wlast = fifo_r_end;
         axi_req_o.wvalid  = 1'b1;
         dma_axi_wr_resp_o.finish = fifo_r_end;
+        dma_aligner_req_o.beat_counter = beat_counter_ff;
+        // dma_aligner_req_o.wlast = fifo_r_end;
       end
       // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
-      if(~dma_fifo_resp_i.empty) begin
+      // if(~dma_fifo_resp_i.empty) begin
+      if(~dma_aligner_resp_i.empty) begin
         // dma_fifo
-        dma_fifo_req_o.rd = axi_resp_i.wready && (~fifo_r_end);
-        next_fifo_r_hpn   = axi_resp_i.wready && (~fifo_r_end);
-      end
-      // [给slave写数据 w] - 如果FIFO没有空&slave的写ready信号存在，那么就一直读fifo里面的东西然后输出写给slave
-      if(~dma_fifo_resp_i.empty) begin
-        // dma_fifo
-        dma_fifo_req_o.rd = axi_resp_i.wready && (~fifo_r_end);
-        next_fifo_r_hpn   = axi_resp_i.wready && (~fifo_r_end);
+        // dma_fifo_req_o.rd = axi_resp_i.wready && (~fifo_r_end);
+        dma_aligner_req_o.rd = axi_resp_i.wready && (~fifo_r_end);
+        next_fifo_r_hpn      = axi_resp_i.wready && (~fifo_r_end);
       end
       axi_req_o.bready = 1'b1;
       if (axi_resp_i.bvalid) begin
@@ -313,6 +328,7 @@ module dma_axi_if
       aw_txn_started_ff <= 1'b0;
       fifo_r_hpn_ff     <= 'b0;
       last_fifo_data_rd <= '0;
+      last_fifo_data_strb <= '0;
       axi_w_valid       <= '0;
     end
     else begin
@@ -329,7 +345,9 @@ module dma_axi_if
         axi_w_valid     <= next_fifo_r_hpn;
       end
       if (fifo_r_hpn_ff) begin
-        last_fifo_data_rd <= dma_fifo_resp_i.data_rd;
+        // last_fifo_data_rd <= dma_fifo_resp_i.data_rd;
+        last_fifo_data_rd <= dma_aligner_resp_i.data_rd;
+        last_fifo_data_strb <= dma_aligner_resp_i.strb;
       end
     end
   end

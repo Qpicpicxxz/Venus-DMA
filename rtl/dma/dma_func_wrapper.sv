@@ -33,8 +33,14 @@ module dma_func_wrapper
   //「FIFO - AXI IF」
   // `s_dma_fifo_req_t` : wr | rd | data_wr[511:0]
   // `s_dma_fifo_resp_t`: data_rd | ocup[fifo_width-1:0] | space[fifo_width-1:0] | full | empty
-  s_dma_fifo_req_t  dma_fifo_req;
-  s_dma_fifo_resp_t dma_fifo_resp;
+  // s_dma_fifo_req_t  dma_fifo_req;
+  // s_dma_fifo_resp_t dma_fifo_resp;
+  // [Streamer - FIFO - AXI IF]
+  s_dma_aligner_req_t streamer_src_info;
+  s_dma_aligner_req_t streamer_dst_info;
+  s_dma_shifter_req_t trans_req_info;
+  s_dma_fifo_req_t    axi_if_req;
+  s_dma_fifo_resp_t   axi_if_resp;
 
   s_dma_error_t     axi_dma_err;
   s_dma_error_t     dma_stream_rd_err;
@@ -79,6 +85,8 @@ module dma_func_wrapper
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_rd_req),
     .dma_axi_resp_i         (dma_axi_rd_resp),
+    // From/To Shift Aligner
+    .dma_aligner_req_o      (streamer_src_info),
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_rd_valid_o),
     .dma_stream_done_o      (dma_stream_rd_done_i),
@@ -96,28 +104,46 @@ module dma_func_wrapper
     // From/To AXI I/F
     .dma_axi_req_o          (dma_axi_wr_req),
     .dma_axi_resp_i         (dma_axi_wr_resp),
+    // From/To Shift Aligner
+    .dma_aligner_req_o      (streamer_dst_info),
     // To/From DMA FSM
     .dma_stream_valid_i     (dma_stream_wr_valid_o),
     .dma_stream_done_o      (dma_stream_wr_done_i),
     .dma_stream_err_o       (dma_stream_wr_err)
   );
 
-  fifo_model #(
+  dma_shift_aligner # (
     .OUTPUT_DELAY(1),
-    .SLOTS(`DMA_FIFO_DEPTH),
-    .WIDTH(`DMA_DATA_WIDTH),
-    .useSMICModel(1)
-  ) u_dma_fifo(
-    .clk              (clk),
-    .rstn             (rstn),
-    .clear_i          (clear_dma),
-    .write_i          (dma_fifo_req.wr),
-    .read_i           (dma_fifo_req.rd),
-    .data_i           (dma_fifo_req.data_wr),
-    .data_o           (dma_fifo_resp.data_rd),
-    .full_o           (dma_fifo_resp.full),
-    .empty_o          (dma_fifo_resp.empty)
+    .DATA_WIDTH(`DMA_DATA_WIDTH),
+    .FIFO_DEPTH(16)
+  ) u_dma_shift_aligner (
+    .clk (clk),
+    .rstn (rstn),
+    .clear_i (clear_dma),
+    .dma_go_i               (dma_go_i),
+    .dma_desc_i             (dma_desc_i),
+    .src_info_i (streamer_src_info),
+    .dst_info_i (streamer_dst_info),
+    .axi_if_req_i (axi_if_req),
+    .axi_if_resp_o (axi_if_resp)
   );
+
+  // fifo_model #(
+  //   .OUTPUT_DELAY(1),
+  //   .SLOTS(`DMA_FIFO_DEPTH),
+  //   .WIDTH(`DMA_DATA_WIDTH),
+  //   .useSMICModel(1)
+  // ) u_dma_fifo(
+  //   .clk              (clk),
+  //   .rstn             (rstn),
+  //   .clear_i          (clear_dma),
+  //   .write_i          (dma_fifo_req.wr),
+  //   .read_i           (dma_fifo_req.rd),
+  //   .data_i           (dma_fifo_req.data_wr),
+  //   .data_o           (dma_fifo_resp.data_rd),
+  //   .full_o           (dma_fifo_resp.full),
+  //   .empty_o          (dma_fifo_resp.empty)
+  // );
 
   dma_axi_if u_dma_axi_if (
     .clk                  (clk),
@@ -130,9 +156,9 @@ module dma_func_wrapper
     // Master AXI I/F
     .axi_req_o            (axi_req_o),
     .axi_resp_i           (axi_resp_i),
-    // From/To FIFOs interface
-    .dma_fifo_req_o       (dma_fifo_req),
-    .dma_fifo_resp_i      (dma_fifo_resp),
+    // From/To Aligner interface
+    .dma_aligner_req_o     (axi_if_req),
+    .dma_aligner_resp_i    (axi_if_resp),
     // From/To DMA FSM
     .axi_pend_txn_o       (axi_pend_txn),
     .axi_dma_err_o        (axi_dma_err),

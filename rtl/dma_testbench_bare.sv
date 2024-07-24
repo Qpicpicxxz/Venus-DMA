@@ -76,12 +76,12 @@ Multiplexer u_multiplexer (
   .axi_resp_i_bfm (axi_resp_i_bfm)
 );
 
-task automatic ram_init;
-  for (int i = 0; i < 512; i++)begin
-    data64.randomize();
-    u_axi4_master_bfm.BFM_WRITE_BURST2048(RAM_START_ADDR, (32'h800 * i), {32{data64.data}}, `ENABLE_MESSAGE);
-  end
-endtask
+// task automatic ram_init;
+//   for (int i = 0; i < 512; i++)begin
+//     data64.randomize();
+//     u_axi4_master_bfm.BFM_WRITE_BURST2048(RAM_START_ADDR, (32'h800 * i), {32{data64.data}}, `ENABLE_MESSAGE);
+//   end
+// endtask
 
 // 时钟生成
 always begin
@@ -121,27 +121,33 @@ initial begin
   $display("[%0t]: Stop reseting...", $time);
   reset_n_mem = 1'b1;
   reset_n     = 1'b1;
-  data64 = new();
-  ram_init();
+  master_ctrl = 1'b0; // change to BFM
+  $display("[%0t]: Start initializing memory..", $time);
+  u_axi4_master_bfm.BFM_WRITE_BURST64(32'h0000_0000,32'h0000_0000,TESTDATA512bits_block_0,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_WRITE_BURST64(32'h0000_0040,32'h0000_0000,TESTDATA512bits_block_1,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_WRITE_BURST64(32'h0000_0080,32'h0000_0000,TESTDATA512bits_block_2,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_WRITE_BURST64(32'h0000_00c0,32'h0000_0000,TESTDATA512bits_block_3,`ENABLE_MESSAGE);
+  // u_axi4_master_bfm.BFM_WRITE_BURST2048(32'h0100_0800,32'h0000_0000,TESTDATA16384bits_2,`ENABLE_MESSAGE);
+  // data64 = new();
+  // ram_init();
+
 
   // 8836 - 0x2284
   // 0x81
-  master_ctrl = 1'b0; // change to BFM
-  $display("[%0t]: Start initializing memory..", $time);
 
   master_ctrl = 1'b1; // change to DMA
 
-  start_dma_transfer(32'h0000_0000,32'h1100_0000,32'h30);
-  @(posedge dma_stats.done);
-  start_dma_transfer(32'h0000_0000,32'h2100_0000,32'h320);
-  @(posedge dma_stats.done);
-  start_dma_transfer(32'h0001_0000,32'h4100_0000,32'h600);
-  @(posedge dma_stats.done);
-  start_dma_transfer(32'h0000_0100,32'h3100_0000,32'h1000);
-  @(posedge dma_stats.done);
-  start_dma_transfer(32'h0000_1900,32'h1100_0000,32'h22c0);
-  @(posedge dma_stats.done);
-  start_dma_transfer(32'h0000_0008,32'h1100_0000,32'h24);
+  start_dma_transfer(32'h0000_000c,32'h1000_0034,216);
+  // @(posedge dma_stats.done);
+  // start_dma_transfer(32'h0000_0000,32'h2100_0000,32'h320);
+  // @(posedge dma_stats.done);
+  // start_dma_transfer(32'h0001_0000,32'h4100_0000,32'h600);
+  // @(posedge dma_stats.done);
+  // start_dma_transfer(32'h0000_0100,32'h3100_0000,32'h1000);
+  // @(posedge dma_stats.done);
+  // start_dma_transfer(32'h0000_1900,32'h1100_0000,32'h22c0);
+  // @(posedge dma_stats.done);
+  // start_dma_transfer(32'h0000_0008,32'h1100_0000,32'h24);
 
   // dma_desc.src_addr  = 32'h0000_0000;
   // dma_desc.dst_addr  = 32'h1100_0000;
@@ -160,11 +166,14 @@ initial begin
   // dma_go_i = 1'b0;
 
 
-  repeat(5000) @(posedge clk);
+  repeat(1000) @(posedge clk);
   master_ctrl = 1'b0;
-  u_axi4_master_bfm.BFM_READ_BURST2048(32'h1100_0000,32'h0000_0000,response16384,`ENABLE_MESSAGE);
-
-  $stop;
+  u_axi4_master_bfm.BFM_READ_BURST64(32'h1000_0000,32'h0000_0000,response512,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_READ_BURST64(32'h1000_0040,32'h0000_0000,response512,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_READ_BURST64(32'h1000_0080,32'h0000_0000,response512,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_READ_BURST64(32'h1000_00c0,32'h0000_0000,response512,`ENABLE_MESSAGE);
+  u_axi4_master_bfm.BFM_READ_BURST64(32'h1000_0100,32'h0000_0000,response512,`ENABLE_MESSAGE);
+  $finish;
 end
 
 always@(posedge clk or negedge reset_n)begin

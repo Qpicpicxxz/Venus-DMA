@@ -25,6 +25,10 @@ typedef logic [31:0]                        desc_addr_t;
 typedef logic [`DMA_BYTES_WIDTH-1:0]        desc_num_t;
 typedef logic [FIFO_WIDTH:0]                fifo_sz_t;
 
+localparam StrbWidth   = `DMA_DATA_WIDTH / 8;
+localparam OffsetWidth = $clog2(StrbWidth);
+typedef logic [OffsetWidth-1:0]             bytes_offset_t;
+
 typedef enum logic [1:0] {
   // slave传来的read error
   DMA_AXI_RD_ERR,
@@ -73,7 +77,6 @@ typedef struct packed {
   axi_size_t    size;
   axi_strb_t    strb;
   logic         valid;
-  // logic         half_trans_valid;
 } s_dma_axi_req_t;
 
 typedef struct packed {
@@ -86,12 +89,14 @@ typedef struct packed {
   logic       wr;
   logic       rd;
   axi_data_t  data_wr;
+  logic       rvalid;
+  logic       rlast;
+  axi_len_t   beat_counter;
 } s_dma_fifo_req_t;
 
 typedef struct packed {
   axi_data_t  data_rd;
-  // fifo_sz_t   ocup;
-  // fifo_sz_t   space;
+  axi_strb_t  strb;
   logic       full;
   logic       empty;
 } s_dma_fifo_resp_t;
@@ -125,5 +130,30 @@ typedef struct packed {
   // 读64byte的数据(所有的csr范围)
   logic [511:0] csr_rdata;
 } csr_resp_t;
+
+typedef struct packed {
+  bytes_offset_t head;
+  bytes_offset_t tail;
+  axi_len_t      alen;
+  logic          valid;
+} s_dma_aligner_req_t;
+
+typedef struct packed {
+  desc_addr_t src_addr;
+  desc_addr_t dst_addr;
+  logic valid;
+}s_dma_shifter_req_t;
+
+typedef enum logic [1:0] {
+  START_BUF,
+  LEFT_BUF,
+  RIGHT_BUF,
+  IDLE_BUF
+} sa_st_t;
+
+typedef struct packed {
+  axi_strb_t head_strb;
+  axi_strb_t tail_strb;
+} s_dma_strb_req_t;
 
 endpackage
