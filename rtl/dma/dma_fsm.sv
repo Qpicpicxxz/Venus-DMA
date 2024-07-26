@@ -7,14 +7,13 @@ module dma_fsm
 
   // 启动控制 ｜ 事物描述 | 总体状态[error/done]
   input   logic                             dma_go_i,
-  input   s_dma_desc_t                      dma_desc_i,
   output  s_dma_status_t                    dma_stats_o,
   output  s_dma_error_t                     dma_error_o,
 
   // From/To AXI I/F
   input                                     axi_pend_txn_i,
   input   s_dma_error_t                     axi_txn_err_i,
-  output  logic                             clear_dma_o,
+  output  logic                             dma_clear_o,
   output  logic                             dma_active_o,
 
   // To/From streamers
@@ -75,7 +74,7 @@ module dma_fsm
 
     dma_stats_o.done   = (cur_st_ff == DMA_ST_DONE);
     dma_stats_o.active = (cur_st_ff == DMA_ST_RUN);
-    clear_dma_o        = (cur_st_ff == DMA_ST_DONE) && (next_st == DMA_ST_IDLE);
+    dma_clear_o        = (cur_st_ff == DMA_ST_DONE) && (next_st == DMA_ST_IDLE);
   end : dma_fsm
 
   // Read streamer
@@ -86,8 +85,6 @@ module dma_fsm
     dma_active_o          = (cur_st_ff == DMA_ST_RUN);
 
     if (cur_st_ff == DMA_ST_RUN) begin
-      // 如果传输的bytes不为 0 和 `rd_desc_done_ff` = 0
-      // if((|dma_desc_i.num_bytes) && (~rd_desc_done_ff)) begin
       if (~rd_desc_done_ff) begin
         dma_stream_rd_valid_o = 1'b1; // 告诉streamer Read操作valid
       end
@@ -108,12 +105,11 @@ module dma_fsm
   end : rd_streamer
 
   always_comb begin : wr_streamer
-    dma_stream_wr_valid_o  = 1'b0;
-    next_wr_desc_done    = wr_desc_done_ff;
-    pending_wr_desc      = 1'b0;
+    dma_stream_wr_valid_o = 1'b0;
+    next_wr_desc_done     = wr_desc_done_ff;
+    pending_wr_desc       = 1'b0;
 
     if (cur_st_ff == DMA_ST_RUN) begin
-      // if((|dma_desc_i.num_bytes) && (~wr_desc_done_ff)) begin
       if (~wr_desc_done_ff) begin
         dma_stream_wr_valid_o = 1'b1;
       end
@@ -165,11 +161,11 @@ module dma_fsm
 
   always_ff @ (posedge clk or negedge rstn) begin
     if (~rstn) begin
-      cur_st_ff       <= dma_st_t'('0);
+      cur_st_ff       <= '0;
       rd_desc_done_ff <= '0;
       wr_desc_done_ff <= '0;
-      err_lock_ff     <= 1'b0;
-      dma_error_ff    <= s_dma_error_t'('0);
+      err_lock_ff     <= '0;
+      dma_error_ff    <= '0;
     end
     else begin
       cur_st_ff       <= next_st;

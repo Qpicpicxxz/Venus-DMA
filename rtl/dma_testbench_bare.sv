@@ -131,42 +131,14 @@ initial begin
   // data64 = new();
   // ram_init();
 
-
-  // 8836 - 0x2284
-  // 0x81
-
   master_ctrl = 1'b1; // change to DMA
 
   start_dma_transfer(32'h0000_000c,32'h1000_0034,216);
-  // @(posedge dma_stats.done);
-  // start_dma_transfer(32'h0000_0000,32'h2100_0000,32'h320);
-  // @(posedge dma_stats.done);
-  // start_dma_transfer(32'h0001_0000,32'h4100_0000,32'h600);
-  // @(posedge dma_stats.done);
-  // start_dma_transfer(32'h0000_0100,32'h3100_0000,32'h1000);
-  // @(posedge dma_stats.done);
-  // start_dma_transfer(32'h0000_1900,32'h1100_0000,32'h22c0);
-  // @(posedge dma_stats.done);
-  // start_dma_transfer(32'h0000_0008,32'h1100_0000,32'h24);
+  @(posedge dma_stats.done);
+  start_dma_transfer(32'h0000_0034,32'h1000_0004,28);
+  @(posedge dma_stats.done);
 
-  // dma_desc.src_addr  = 32'h0000_0000;
-  // dma_desc.dst_addr  = 32'h1100_0000;
-  // dma_desc.num_bytes = 32'h30;
-  // @(posedge clk);
-  // dma_go_i = 1'b1;
-  // @(posedge clk);
-  // dma_go_i = 1'b0;
-
-  // dma_desc.src_addr  = 32'h0000_0000;
-  // dma_desc.dst_addr  = 32'h2100_0000;
-  // dma_desc.num_bytes = 32'h320;
-  // @(posedge clk);
-  // dma_go_i = 1'b1;
-  // @(posedge clk);
-  // dma_go_i = 1'b0;
-
-
-  repeat(1000) @(posedge clk);
+  // repeat(1000) @(posedge clk);
   master_ctrl = 1'b0;
   u_axi4_master_bfm.BFM_READ_BURST64(32'h1000_0000,32'h0000_0000,response512,`ENABLE_MESSAGE);
   u_axi4_master_bfm.BFM_READ_BURST64(32'h1000_0040,32'h0000_0000,response512,`ENABLE_MESSAGE);

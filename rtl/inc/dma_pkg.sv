@@ -19,7 +19,6 @@ import venus_soc_pkg::*;
 `define VENUSDMA_ERRORADDR_OFFSET 6'h28
 `define VENUSDMA_ERRORSRC_OFFSET  6'h30
 
-// DMA_FIFO_DEPTH = 16 | FIFO_WIDTH = 4
 localparam FIFO_WIDTH = $clog2(`DMA_FIFO_DEPTH>1?`DMA_FIFO_DEPTH:2);
 typedef logic [31:0]                        desc_addr_t;
 typedef logic [`DMA_BYTES_WIDTH-1:0]        desc_num_t;
@@ -51,40 +50,42 @@ typedef enum logic [1:0] {
   DMA_ST_DONE
 } dma_st_t;
 
-// Interface between DMA FSM / Streamer and DMA CSR
+/* CSR/wrapper -> Streamer/Shift Aligner */
 typedef struct packed {
   desc_addr_t src_addr;
   desc_num_t  num_bytes;
   desc_addr_t dst_addr;
 } s_dma_desc_t;
 
+/* FSM -> wrapper */
 typedef struct packed {
   desc_addr_t addr;
   err_src_t   src;
   logic       valid;
 } s_dma_error_t;
 
+/* FSM -> wrapper */
 typedef struct packed {
   logic       error;
   logic       done;
   logic       active;
 } s_dma_status_t;
 
-// Interface between DMA Streamer and DMA AXI
+/* Streamer -> AXI IF */
 typedef struct packed {
   axi_addr_t    addr;
   axi_len_t     alen;
   axi_size_t    size;
-  axi_strb_t    strb;
   logic         valid;
-} s_dma_axi_req_t;
+} s_dma_stream_req_t;
 
+/* Streamer <- AXI IF */
 typedef struct packed {
-  logic       ready;
+  logic       ready;  // arready | awready
   logic       finish;
-} s_dma_axi_resp_t;
+} s_dma_stream_resp_t;
 
-// Interface between DMA FIFOs and DMA AXI
+/* AXI IF -> Shift Aligner */
 typedef struct packed {
   logic       wr;
   logic       rd;
@@ -92,29 +93,32 @@ typedef struct packed {
   logic       rvalid;
   logic       rlast;
   axi_len_t   beat_counter;
-} s_dma_fifo_req_t;
+} s_dma_axi_req_t;
 
+/* AXI IF <- Shift Aligner */
 typedef struct packed {
   axi_data_t  data_rd;
   axi_strb_t  strb;
   logic       full;
   logic       empty;
-} s_dma_fifo_resp_t;
+} s_dma_axi_resp_t;
 
-// Streamer - AXI IF 之间寄存传输信息
+/* Shift Aligner <- Streamer */
 typedef struct packed {
-  axi_addr_t   raddr;
-  axi_strb_t   rstrb;   // 备用[原本用来应对地址unligned情况的]
-  logic       half_trans_valid;
-} s_rd_req_t;
+  bytes_offset_t head;
+  bytes_offset_t tail;
+  axi_len_t      alen;
+  logic          valid;
+} s_dma_align_req_t;
 
+/* wrapper-> Shift Aligner */
 typedef struct packed {
-  axi_addr_t   waddr;
-  axi_len_t    awlen;
-  axi_strb_t   wstrb;
-  logic        half_trans_valid;
-} s_wr_req_t;
+  desc_addr_t src_addr;
+  desc_addr_t dst_addr;
+  logic valid;
+}s_dma_shift_req_t;
 
+/* CSR Relevant */
 typedef struct packed {
   logic csr_wr_en;
   // 不传递wstrb意味着：每次都会写整个[31:0]的范围！！！
@@ -130,30 +134,5 @@ typedef struct packed {
   // 读64byte的数据(所有的csr范围)
   logic [511:0] csr_rdata;
 } csr_resp_t;
-
-typedef struct packed {
-  bytes_offset_t head;
-  bytes_offset_t tail;
-  axi_len_t      alen;
-  logic          valid;
-} s_dma_aligner_req_t;
-
-typedef struct packed {
-  desc_addr_t src_addr;
-  desc_addr_t dst_addr;
-  logic valid;
-}s_dma_shifter_req_t;
-
-typedef enum logic [1:0] {
-  START_BUF,
-  LEFT_BUF,
-  RIGHT_BUF,
-  IDLE_BUF
-} sa_st_t;
-
-typedef struct packed {
-  axi_strb_t head_strb;
-  axi_strb_t tail_strb;
-} s_dma_strb_req_t;
 
 endpackage
